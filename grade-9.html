@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Science Arcade — Grade 9</title>
+<style>
+:root{
+  --bg:#f4f1ea; --card:#ffffff; --ink:#1f2a37; --soft:#5b6675; --line:#e2ddd2;
+  --brand:#2f6f9f; --brand-ink:#ffffff; --good:#2e8b57; --good-bg:#e6f4ec;
+  --warn:#b4531f; --warn-bg:#fbeee6; --gold:#d99a00; --accent:#7b5ea7;
+  --radius:18px; --fs:19px;
+}
+:root[data-theme="dark"]{
+  --bg:#141a22; --card:#1e2733; --ink:#eef2f6; --soft:#a9b4c2; --line:#2e3a48;
+  --brand:#5aa0d6; --brand-ink:#0d1520; --good:#5cc98c; --good-bg:#16301f;
+  --warn:#f08a55; --warn-bg:#3a2216; --gold:#ffc53d; --accent:#b39ddb;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:var(--fs)/1.5 "Segoe UI","Trebuchet MS",Verdana,system-ui,sans-serif;letter-spacing:.01em}
+body.calm *{animation:none!important;transition:none!important}
+#app{max-width:880px;margin:0 auto;padding:16px 16px 60px}
+h1,h2,h3{line-height:1.2;margin:.2em 0 .5em}
+h1{font-size:1.6em} h2{font-size:1.3em} h3{font-size:1.1em}
+button{font:inherit;color:inherit;cursor:pointer;border:0;border-radius:var(--radius)}
+button:focus-visible{outline:4px solid var(--gold);outline-offset:2px}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between;margin-bottom:14px}
+.chip{background:var(--card);border:2px solid var(--line);border-radius:999px;padding:4px 14px;font-weight:600;white-space:nowrap}
+.card{background:var(--card);border:2px solid var(--line);border-radius:var(--radius);padding:18px;margin:12px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.big{display:block;width:100%;text-align:left;background:var(--card);border:3px solid var(--line);padding:16px 18px;font-size:1.05em;min-height:64px}
+.big:hover{border-color:var(--brand)}
+.big .ico{font-size:1.6em;margin-right:10px;vertical-align:middle}
+.big small{display:block;color:var(--soft);font-size:.8em;margin-top:2px}
+.primary{background:var(--brand);color:var(--brand-ink);padding:14px 26px;font-weight:700;font-size:1.05em;min-height:56px}
+.ghost{background:transparent;border:2px solid var(--line);padding:10px 18px;min-height:48px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.opt{display:block;width:100%;text-align:left;background:var(--card);border:3px solid var(--line);padding:14px 18px;margin:10px 0;min-height:60px}
+.opt:hover{border-color:var(--brand)}
+.opt.right{border-color:var(--good);background:var(--good-bg)}
+.opt.wrong{border-color:var(--warn);background:var(--warn-bg)}
+.prompt{font-size:1.2em;font-weight:600;margin:6px 0 12px}
+.feedback{border-radius:var(--radius);padding:14px 18px;margin:12px 0;font-weight:600}
+.feedback.good{background:var(--good-bg);color:var(--good)}
+.feedback.try{background:var(--warn-bg);color:var(--warn)}
+.progress{height:14px;background:var(--line);border-radius:999px;overflow:hidden}
+.progress>i{display:block;height:100%;background:var(--good);border-radius:999px}
+.dots{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}
+.dots b{width:16px;height:16px;border-radius:50%;background:var(--line)}
+.dots b.ok{background:var(--good)} .dots b.no{background:var(--warn)} .dots b.now{outline:3px solid var(--brand)}
+.pet{display:flex;align-items:center;gap:18px}
+.pet svg{flex:0 0 auto}
+.bob{animation:bob 2.4s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-6px)}}
+.pop{animation:pop .4s ease-out}
+@keyframes pop{0%{transform:scale(.8)}70%{transform:scale(1.08)}100%{transform:scale(1)}}
+.tiles{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.tile{min-width:52px;height:56px;font-size:1.3em;font-weight:700;background:var(--card);border:3px solid var(--line);text-transform:uppercase}
+.tile.used{opacity:.25}
+.slot{min-height:64px;border:3px dashed var(--line);border-radius:var(--radius);padding:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.flash{min-height:220px;display:flex;flex-direction:column;justify-content:center;text-align:center;font-size:1.25em;cursor:pointer}
+.flash .side{color:var(--soft);font-size:.7em;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
+.match{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.match button{background:var(--card);border:3px solid var(--line);padding:12px;text-align:left;min-height:58px}
+.match button.sel{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 12%,var(--card))}
+.match button.done{border-color:var(--good);background:var(--good-bg);opacity:.55}
+.match button.shake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.ring{--p:0;width:54px;height:54px;border-radius:50%;background:conic-gradient(var(--good) calc(var(--p)*1%),var(--line) 0);display:grid;place-items:center;flex:0 0 auto}
+.ring span{width:40px;height:40px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-size:.7em;font-weight:700}
+.shop{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.shop button{background:var(--card);border:3px solid var(--line);padding:12px;text-align:center}
+.shop button.on{border-color:var(--good)}
+.shop .em{font-size:2em;display:block}
+.badge{display:inline-flex;flex-direction:column;align-items:center;width:120px;margin:6px;text-align:center;font-size:.8em;opacity:.35}
+.badge.got{opacity:1} .badge .em{font-size:2.2em}
+.speak{background:transparent;border:2px solid var(--line);border-radius:999px;padding:4px 12px;font-size:.85em;margin-left:6px}
+.muted{color:var(--soft)}
+.center{text-align:center}
+.confetti{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+.confetti i{position:absolute;top:-20px;width:10px;height:14px;animation:fall 1.6s linear forwards}
+@keyframes fall{to{transform:translateY(105vh) rotate(540deg)}}
+input[type=range]{width:200px}
+@media (max-width:560px){ :root{--fs:17px} .match{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<main id="app" aria-live="polite"></main>
+<script>
+const DATA = {"grade": "g9-igcse1", "label": "Grade 9", "strap": "IGCSE Chemistry · Year 1", "built": "2026-09-22", "units": [{"id": "g9-igcse1-u01", "n": 1, "title": "States of Matter", "terms": [["ac3db1fa0d", "Kinetic energy", "The energy a particle has because it is moving"], ["5dbb356c68", "Kinetic particle theory", "The model that explains the properties of matter by the movement and arrangement of its particles"], ["6ac08fcbeb", "Forces of attraction", "The attractions between particles that hold a solid and a liquid together"], ["d8e73d222f", "Melting point", "The temperature at which a solid changes into a liquid"], ["8a4c0f04a0", "Boiling point", "The temperature at which a liquid changes into a gas throughout the liquid"], ["f149ceb4c0", "Melting", "Change from solid to liquid"], ["14ee9e6d25", "Freezing", "Change from liquid to solid"], ["55a3de2b53", "Boiling", "Change from liquid to gas, throughout the liquid, at the boiling point"], ["8f997a2d2d", "Evaporating", "Change from liquid to gas, at the surface only, below the boiling point"], ["b0b85828fa", "Condensing", "Change from gas to liquid"], ["28c7b370e0", "Compressible", "Able to be squeezed into a smaller volume"], ["171786c596", "Density", "Mass per unit volume"], ["438313de0a", "Diffusion", "The net movement of particles from a higher to a lower concentration, caused by their random motion"], ["80875e76e8", "Concentration gradient", "A difference in concentration between two regions"], ["9f7490cb95", "Relative molecular mass (Mᵣ)", "The sum of the relative atomic masses of all the atoms in a molecule"]], "checks": [], "facts": [["cfad00f22f", "All matter is made of particles that are always moving. In a solid they vibrate about fixed positions. In a liquid and a gas they move from place to place"], ["f65f8bc751", "The particles themselves never change during a change of state. A water molecule is the same molecule in ice, in water and in steam. What changes is how far apart the particles are, how they are arranged, and how fast they move"], ["4f261c6d66", "Temperature is a measure of the average kinetic energy of the particles. A higher temperature means the particles are moving faster on average"], ["14094fbf6e", "Particles attract one another. These forces of attraction are strongest when particles are close together, and must be overcome to pull particles apart"]]}, {"id": "g9-igcse1-u02", "n": 2, "title": "Atoms, Elements and Compounds", "terms": [["02322c41f1", "Element", "A substance containing only one type of atom"], ["178fa05540", "Compound", "Two or more types of atom chemically bonded in a fixed ratio"], ["d820802540", "Mixture", "Two or more substances not chemically bonded"], ["7c65fb0cac", "Nucleus", "The central part of an atom, containing the protons and neutrons"], ["d971ccbab5", "Proton number (atomic number)", "The number of protons in the nucleus; it defines the element"], ["63938fef88", "Nucleon number (mass number)", "The total number of protons and neutrons in the nucleus"], ["93023c3f2d", "Shell", "A region around the nucleus in which electrons are found"], ["434f52d562", "Electronic configuration", "The arrangement of electrons in shells, e.g. 2,8,1"], ["3edd2e3e2d", "Isotopes", "Atoms of the same element with the same proton number but different numbers of neutrons"], ["040511bc54", "Relative atomic mass (Aᵣ)", "The average mass of an element's isotopes on the carbon-12 scale"], ["9b0072e90d", "Ion", "An atom or group of atoms carrying an electrical charge"], ["3006174171", "Cation", "A positive ion, formed when an atom loses electrons"], ["020263e7cd", "Anion", "A negative ion, formed when an atom gains electrons"], ["4d74b2c46d", "Ionic bond", "The strong electrostatic attraction between oppositely charged ions"], ["43e671634b", "Giant ionic lattice", "A regular 3-D arrangement of alternating positive and negative ions"], ["2c9d1fb784", "Covalent bond", "A shared pair of electrons between two atoms"], ["8b52bb5a7b", "Molecule", "A group of atoms held together by covalent bonds"], ["7509176f49", "Intermolecular forces", "The weak forces of attraction between separate molecules"], ["d02ab1ec5a", "Giant covalent structure", "A continuous network of atoms joined by covalent bonds"], ["b0024c721b", "Delocalised electron", "An electron not attached to one atom, free to move through the structure"], ["eedcf5ce01", "Metallic bond", "The electrostatic attraction between positive metal ions and the sea of delocalised electrons"], ["8b7139b30f", "Malleable", "Able to be hammered into shape without breaking"], ["e11f7af43e", "Ductile", "Able to be drawn out into a wire"]], "checks": [["12ebeb4421", "Explain why air is classified as a mixture and not as a compound", "The gases in air are not chemically bonded / combined together. They are present in no fixed ratio and can be separated by physical means"], ["26981be43f", "An atom has proton number 15 and nucleon number 31. State its electronic configuration and give its group and period", "15 electrons, so the configuration is 2,8,5. Five outer-shell electrons, so Group V. Three occupied shells, so Period 3"], ["8a4cffdabb", "Copper has two isotopes: ⁶³Cu (69%) and ⁶⁵Cu (31%). Calculate the relative atomic mass of copper. Give your answer to one decimal place", "[(63 × 69) + (65 × 31)] ÷ 100 = (4347 + 2015) ÷ 100 = 63.6"], ["0d34f09481", "Explain why solid magnesium oxide does not conduct electricity but molten magnesium oxide does", "In the solid, the ions are held in fixed positions in the lattice. When molten, the lattice breaks down and the ions are free to move. Moving ions carry the electrical charge through the liquid"], ["75603e7aa8", "Explain why carbon dioxide has a much lower boiling point than silicon(IV) oxide, even though both contain only covalent bonds", "Carbon dioxide is simple molecular, so only the weak intermolecular forces between the molecules have to be overcome when it boils. Silicon(IV) oxide is giant covalent, so boiling means breaking strong covalent bonds throughout the structure. Breaking covalent bonds requires much more energy than overcoming intermolecular forces"], ["c2b141d414", "Graphite is used as a lubricant and also as an electrode. Explain, in terms of its structure, why it can do both", "Graphite has layers of carbon atoms held together by weak forces between the layers. These layers can slide over each other, which makes it slippery and useful as a lubricant. Each carbon atom uses only three of its four outer electrons for bonding. The fourth electron is delocalised and free to move, so graphite conducts electricity and can be used as an electrode"], ["4eaa0cc675", "Explain, in terms of structure and bonding, why copper can be drawn into wires", "Copper consists of layers of positive metal ions in a sea of delocalised electrons. The layers of ions can slide over each other when a force is applied. The delocalised electrons continue to attract the positive ions in their new positions, so the metallic bonding is not broken"]], "facts": [["11bc517c00", "An atom has a tiny central nucleus containing protons and neutrons, surrounded by electrons moving in shells. Almost all the mass is in the nucleus; almost all the volume is empty space around it"], ["d1fdad182e", "The proton number decides which element an atom is. Change it and you have a different element. Nothing else does this — not the neutrons, not the electrons"], ["eeabeb5b34", "Chemistry happens in the outer shell only. Two atoms with the same number of outer-shell electrons react in the same way, whatever else is different about them"], ["484310a13a", "A full outer shell is stable. The noble gases already have one, which is why they are unreactive. Every other atom bonds in order to reach one"], ["7ec8d95669", "There are exactly three ways to reach a full outer shell: lose electrons, gain electrons, or share them. Metal + non-metal gives ionic bonding, non-metal + non-metal gives covalent bonding, metal + metal gives metallic bonding. That is the whole map"]]}, {"id": "g9-igcse1-u03", "n": 3, "title": "Stoichiometry", "terms": [["29868bcc6b", "Chemical formula", "Symbols and subscripts showing the ratio of atoms of each element in a substance"], ["22c761f69c", "Molecular formula", "The actual number of atoms of each element in one molecule of a compound"], ["738699e281", "Empirical formula", "The simplest whole number ratio of the atoms or ions in a compound"], ["e5ce2a229e", "Spectator ion", "An ion present at the start and unchanged at the end, left out of an ionic equation"], ["67bb669d12", "Ionic equation", "An equation showing only the particles that change during a reaction"], ["5e2f5728c2", "State symbol", "(s), (l), (g) or (aq), showing the physical state of a substance in a reaction"], ["69da559fdb", "Relative atomic mass, Aᵣ", "The average mass of an element's isotopes compared with one twelfth of a carbon-12 atom"], ["30bb02445a", "Relative molecular mass, Mᵣ", "The sum of the relative atomic masses of all the atoms in a molecular formula"], ["1c7d42b8f0", "Relative formula mass", "The same sum, used for an ionic compound, which has no molecules"], ["82fe99bb2d", "Water of crystallisation", "Water molecules held within a crystal, written after a dot in the formula"], ["82a4e63ae5", "Mole", "The unit of amount of substance; the amount containing 6.02 × 10²³ particles"], ["541b619255", "Avogadro constant", "6.02 × 10²³, the number of particles in one mole"], ["b3792f043f", "Molar mass, M", "The mass of one mole of a substance, in g/mol"], ["4f4a23d14a", "Molar gas volume", "24 dm³, the volume of one mole of any gas at room temperature and pressure"], ["d35117032d", "Concentration", "The amount of solute in a given volume of solution, in g/dm³ or mol/dm³"], ["2719fd6893", "Limiting reactant", "The reactant that is used up first and therefore sets the amount of product"], ["8f41566909", "Excess reactant", "A reactant that is not fully used up; some is left over"], ["ed3bc7197c", "Titre", "The volume of solution delivered from a burette to reach the end-point"], ["e37cb9f0c5", "Concordant results", "Titres agreeing within 0.10 cm³, which are the ones averaged"], ["9482648c27", "Theoretical yield", "The mass of product calculated from the limiting reactant, assuming complete reaction"], ["9efe1fe45d", "Actual yield", "The mass of product actually obtained"], ["63c3e20b1f", "Percentage purity", "The proportion of a sample that is the substance named, as a percentage of the whole sample"]], "checks": [["01ba6399f3", "Deduce the formula of aluminium nitrate", "Al³⁺ with NO₃⁻; one +3 needs three −1, and the nitrate repeats, so it needs brackets: Al(NO₃)₃"], ["a641a9c4a3", "Balance: ___C₂H₆ + ___O₂ → ___CO₂ + ___H₂O", "Balance carbon first (2 each side needs 2CO₂), then hydrogen (6 needs 3H₂O), leaving 7 oxygen atoms on the right, which needs 3½O₂. Double everything: 2C₂H₆ + 7O₂ → 4CO₂ + 6H₂O"], ["dbc1352ce4", "Write the ionic equation for aqueous barium chloride reacting with dilute sulfuric acid to give a white precipitate of barium sulfate", "Full: BaCl₂(aq) + H₂SO₄(aq) → BaSO₄(s) + 2HCl(aq). The H⁺ and Cl⁻ are spectators. Ionic: Ba²⁺(aq) + SO₄²⁻(aq) → BaSO₄(s)"], ["4f4758388d", "Calculate the relative formula mass of magnesium nitrate, Mg(NO₃)₂", "24 + 2 × (14 + 48) = 24 + 124 = 148"], ["05696113b7", "Calculate the mass of one mole of CuSO₄·5H₂O", "Mᵣ(CuSO₄) = 64 + 32 + 64 = 160; plus 5 × 18 = 90; total 250, so one mole has a mass of 250 g"], ["d2a60b379f", "Calculate the volume of hydrogen, at r.t.p., produced when 0.48 g of magnesium reacts completely with excess hydrochloric acid. Mg + 2HCl → MgCl₂ + H₂", "n(Mg) = 0.48 ÷ 24 = 0.020 mol. Ratio Mg : H₂ is 1 : 1, so n(H₂) = 0.020 mol. V = 0.020 × 24 = 0.48 dm³, which is 480 cm³"], ["5d64758b45", "2.0 g of sodium hydroxide is dissolved to make 500 cm³ of solution. Calculate its concentration in mol/dm³", "n = 2.0 ÷ 40 = 0.050 mol; V = 500 ÷ 1000 = 0.500 dm³; c = 0.050 ÷ 0.500 = 0.10 mol/dm³"], ["471556ec4a", "A compound contains 40.0% carbon, 6.7% hydrogen and 53.3% oxygen by mass, and has an Mᵣ of 180. Determine its molecular formula", "Moles: C = 40.0 ÷ 12 = 3.33; H = 6.7 ÷ 1 = 6.7; O = 53.3 ÷ 16 = 3.33. Divide by 3.33: 1 : 2 : 1, so the empirical formula is CH₂O, with a mass of 30. 180 ÷ 30 = 6, so the molecular formula is C₆H₁₂O₆"], ["5911e93c86", "Deduce the formula of iron(III) sulfate", "The ions are Fe³⁺ and SO₄²⁻. Two Fe³⁺ give +6 and three SO₄²⁻ give −6, so the ratio is 2 : 3, and the sulfate needs brackets because there is more than one of it: Fe₂(SO₄)₃"], ["72cb31e068", "Write the ionic equation for the reaction between aqueous lead(II) nitrate and aqueous potassium iodide, which forms a yellow precipitate of lead(II) iodide", "The full equation is Pb(NO₃)₂(aq) + 2KI(aq) → PbI₂(s) + 2KNO₃(aq). Everything aqueous splits; the precipitate stays whole. The potassium ions and nitrate ions are unchanged on both sides, so they are spectators and are cancelled. Pb²⁺(aq) + 2I⁻(aq) → PbI₂(s) (Charge check: +2 and 2 × −1 gives zero on the left, and the solid is neutral. Both sides balance.)"], ["83c3968f7f", "Chlorine consists of 75% ³⁵Cl and 25% ³⁷Cl. Calculate the relative atomic mass of chlorine", "Aᵣ = [ (35 × 75) + (37 × 25) ] ÷ 100 = [ 2625 + 925 ] ÷ 100 = 3550 ÷ 100 = 35.5 (Sanity check: the answer must lie between 35 and 37, and closer to 35 because there is more of it. It does.)"], ["2b002f6c31", "Calcium carbonate decomposes on heating: CaCO₃ → CaO + CO₂. Calculate the mass of calcium oxide formed when 50 g of calcium carbonate decomposes completely", "Mᵣ(CaCO₃) = 40 + 12 + 48 = 100 and Mᵣ(CaO) = 40 + 16 = 56, so 100 g of carbonate gives 56 g of oxide. Scaling by 50 ÷ 100 = 0.5: mass of CaO = 0.5 × 56 = 28 g (Sanity check: the CO₂ must account for the missing 22 g, and Mᵣ(CO₂) = 44, half of which is 22. Mass is conserved.)"], ["825a92db94", "Calculate the number of oxygen atoms in 88 g of carbon dioxide. The Avogadro constant is 6.02 × 10²³", "Mᵣ(CO₂) = 12 + 32 = 44, so M = 44 g/mol. n(CO₂) = 88 ÷ 44 = 2.0 mol Each molecule holds two oxygen atoms, so n(O atoms) = 2.0 × 2 = 4.0 mol Number = 4.0 × 6.02 × 10²³ = 2.41 × 10²⁴ atoms (The step students miss is the middle one. The question asks for atoms, not molecules.)"], ["e81eac6eb0", "4.0 g of sodium hydroxide is dissolved in water and made up to 250 cm³ of solution. Calculate the concentration of the solution in mol/dm³", "Mᵣ(NaOH) = 23 + 16 + 1 = 40, so M = 40 g/mol. n = 4.0 ÷ 40 = 0.10 mol V = 250 ÷ 1000 = 0.250 dm³ c = n ÷ V = 0.10 ÷ 0.250 = 0.40 mol/dm³ (Sanity check: a quarter of a litre holds 0.1 mol, so a full litre would hold 0.4 mol. The answer must be four times the amount, and it is.)"], ["307edec82f", "5.3 g of sodium carbonate reacts completely with excess dilute hydrochloric acid: Na₂CO₃ + 2HCl → 2NaCl + H₂O + CO₂. Calculate the volume of carbon dioxide produced at r.t.p", "Mᵣ(Na₂CO₃) = 46 + 12 + 48 = 106. In: n(Na₂CO₃) = 5.3 ÷ 106 = 0.050 mol Across: the ratio Na₂CO₃ : CO₂ is 1 : 1, so n(CO₂) = 0.050 mol Out: V = 0.050 × 24 = 1.2 dm³ (The word \"excess\" is doing work: it tells you the acid is not the limiting reactant, so you can ignore it entirely.)"], ["2ed059cbfd", "5.4 g of aluminium is heated with 48.0 g of iron(III) oxide: 2Al + Fe₂O₃ → Al₂O₃ + 2Fe. Determine which reactant is limiting, and calculate the maximum mass of iron produced", "n(Al) = 5.4 ÷ 27 = 0.20 mol; Mᵣ(Fe₂O₃) = 112 + 48 = 160, so n(Fe₂O₃) = 48.0 ÷ 160 = 0.30 mol Divide by coefficients: Al gives 0.20 ÷ 2 = 0.10; Fe₂O₃ gives 0.30 ÷ 1 = 0.30. The smaller is aluminium, so aluminium is limiting Then n(Fe) = 0.20 × (2 ÷ 2) = 0.20 mol, and m = 0.20 × 56 = 11.2 g"], ["6ed56a479c", "25.0 cm³ of 0.100 mol/dm³ sodium hydroxide is exactly neutralised by 20.0 cm³ of sulfuric acid: 2NaOH + H₂SO₄ → Na₂SO₄ + 2H₂O. Calculate the concentration of the sulfuric acid in mol/dm³", "In: n(NaOH) = c × V = 0.100 × (25.0 ÷ 1000) = 2.50 × 10⁻³ mol Across: the ratio NaOH : H₂SO₄ is 2 : 1, so n(H₂SO₄) = 2.50 × 10⁻³ ÷ 2 = 1.25 × 10⁻³ mol Out: c = n ÷ V = 1.25 × 10⁻³ ÷ (20.0 ÷ 1000) = 0.0625 mol/dm³ (Sanity check: the acid is more concentrated per particle than the alkali would suggest, because each H₂SO₄ supplies two H⁺. Dividing by 2 in the middle step is the chemistry, not a tidying-up move.)"], ["02a63aab6a", "A hydrocarbon contains 82.7% carbon and 17.3% hydrogen by mass. Its relative molecular mass is 58. Determine its empirical formula and its molecular formula", "Moles: C = 82.7 ÷ 12 = 6.89; H = 17.3 ÷ 1 = 17.3 Divide by the smaller: C = 1.00; H = 17.3 ÷ 6.89 = 2.51, which is 2.5 Multiply both by 2: C₂H₅, the empirical formula Its mass is 24 + 5 = 29, and 58 ÷ 29 = 2, so the molecular formula is C₄H₁₀ (A ratio landing on a .5 is a signal to double, not a rounding error to be tidied away.)"], ["fa01e01580", "An impure 20.0 g sample of limestone is heated until it fully decomposes, giving 4.40 g of carbon dioxide. CaCO₃ → CaO + CO₂. Calculate the percentage purity of the limestone", "n(CO₂) = 4.40 ÷ 44 = 0.100 mol The ratio CaCO₃ : CO₂ is 1 : 1, so n(CaCO₃) = 0.100 mol m(CaCO₃) = 0.100 × 100 = 10.0 g of pure carbonate % purity = (10.0 ÷ 20.0) × 100 = 50.0% (Note what the impurity does: it is in the 20.0 g and contributes no CO₂, which is exactly why the gas measures the pure part.)"]], "facts": [["64a3d3f24e", "A chemical formula states a fixed ratio of atoms, and the ratio is decided by the charges on the ions or by the bonding — never by you. This is why you can put a number in front of a formula to balance an equation, but you can never change a subscript inside one"], ["a17fb08593", "Atoms are far too small to weigh, so every mass in chemistry is a relative mass. All of them are measured against the same standard: one twelfth of the mass of a carbon-12 atom. That is why Aᵣ and Mᵣ are ratios and carry no units"], ["24d901cdfe", "In a chemical reaction the atoms are only rearranged. Every atom present at the start is present at the end, so the total mass cannot change. Balancing an equation is nothing more than writing that fact down"], ["49f8d70ce1", "A balanced equation gives the reacting ratio in particles, not in grams. 2Mg + O₂ → 2MgO says two magnesium atoms for every one oxygen molecule. It does not say 2 g of magnesium"], ["ef0dfe9267", "The mole is the bridge between F4 and the balance on the bench. One mole is 6.02 × 10²³ particles, and one mole of any substance has a mass in grams equal to its Aᵣ or Mᵣ"], ["958e888d9e", "Every calculation in this unit is the same three moves: into moles, across the equation, out of moles. Only the doors change — you may go in through a mass, a gas volume or a solution, and come out through a different one. Learn the three moves once and you have learned every question in this topic"]]}, {"id": "g9-igcse1-u04", "n": 4, "title": "Electrochemistry", "terms": [["803b0725bc", "Electrolysis", "The decomposition of an ionic compound, when molten or in aqueous solution, by the passage of an electric current"], ["5d60338db1", "Electrolyte", "An ionic compound, molten or in aqueous solution, that conducts electricity and is decomposed by it"], ["6f9c05c19e", "Electrode", "A rod or plate that carries the current into and out of the electrolyte"], ["ec4f925d7e", "Anode", "The positive electrode, where oxidation occurs"], ["4a974df896", "Cathode", "The negative electrode, where reduction occurs"], ["099e6321f6", "Inert electrode", "An electrode that takes no part in the reaction — graphite or platinum"], ["da99349c41", "Active electrode", "An electrode that takes part in the reaction, such as a copper anode that dissolves"], ["1c7ed7d9d8", "Cation", "A positively charged ion, which migrates to the cathode"], ["19e049bd48", "Anion", "A negatively charged ion, which migrates to the anode"], ["f73f906b43", "Discharge", "The loss of an ion's charge at an electrode, converting it to a neutral atom or molecule"], ["93c6225683", "Oxidation", "Loss of electrons — occurs at the anode"], ["f74929bb96", "Reduction", "Gain of electrons — occurs at the cathode"], ["49bd464be5", "Half-equation", "An equation showing the electron loss or gain at one electrode only"], ["c81665798c", "Binary compound", "A compound containing only two elements"], ["5392c24d52", "Brine", "Concentrated aqueous sodium chloride"], ["ccd30b3ab8", "Electroplating", "Coating a metal object with a thin layer of another metal by electrolysis"], ["dc6163f945", "Anode sludge", "The insoluble impurities that collect below the anode during copper purification"], ["fe1670d04b", "Fuel cell", "A cell that produces electricity directly from the reaction of a fuel with oxygen"]], "checks": [], "facts": [["2e0f7a6992", "Electrolysis needs mobile ions. A solid ionic compound does not conduct, because its ions are locked in a lattice and cannot move. Melt it or dissolve it and the ions are free. That one sentence answers every \"why does it only conduct when molten or aqueous\" question in the topic"], ["72c0199c83", "Two different things move, and they are not the same thing. Electrons move through the metal wires of the external circuit. Ions move through the electrolyte. Electrons never travel through the solution. Confusing these two is the single most heavily penalised error in this unit"], ["46b47d3987", "The cathode is negative, so it attracts positive ions and gives electrons away — reduction. The anode is positive, so it attracts negative ions and takes electrons — oxidation. Both are forced by the power supply: the battery is doing the work, not the chemistry"], ["d7961e43c6", "A molten binary compound has no competition. It contains exactly two ions, so the metal is discharged at the cathode and the non-metal at the anode, every time. There is nothing to decide"], ["b42ebef890", "Water changes everything. Water supplies H⁺ and OH⁻, so an aqueous solution contains four ions and there is a competition. Two rules settle it: reactivity decides the cathode, concentration decides the anode"], ["c950e2bed4", "Inert electrodes carry the current; active electrodes join in. Swapping carbon for copper does not change what arrives at the electrode — it changes what the electrode itself does. That is why the same electrolyte can give oxygen at one anode and dissolve the other"]]}, {"id": "g9-igcse1-u06", "n": 6, "title": "Chemical Reactions", "terms": [["84f7683877", "Physical change", "A change that produces no new substance"], ["f1b1a9ec69", "Chemical change", "A change that produces one or more new substances"], ["5a4d26da3f", "Rate of reaction", "How quickly reactants are used up or products are formed, per unit time"], ["0a0a139543", "Catalyst", "A substance that increases the rate of a reaction and is unchanged in mass and chemical composition at the end"], ["42ca883de1", "Enzyme", "A biological catalyst"], ["f710fe3bbf", "Collision theory", "The model that reaction requires collisions with at least the activation energy"], ["b31ac3cb92", "Activation energy", "The minimum energy that colliding particles must have in order to react"], ["026b62b516", "Successful collision", "A collision that results in a reaction"], ["2ae71fa7cd", "Limiting reactant", "The reactant that is completely used up, and which therefore sets the amount of product"], ["13e6dcf775", "Reversible reaction", "A reaction in which the products can re-form the reactants, written with ⇌"], ["707adc14a8", "Closed system", "A system from which nothing can enter or leave"], ["6af117ee61", "Equilibrium", "The state in a closed system where the forward and backward rates are equal and the concentrations are constant"], ["f42ce17f7c", "Position of equilibrium", "Whether the equilibrium mixture is mostly products or mostly reactants"], ["2868eb9f6d", "Hydrated", "Containing water of crystallisation"], ["fc6fb83840", "Anhydrous", "Containing no water of crystallisation"], ["de5cf43396", "Compromise conditions", "Conditions chosen to balance yield against rate, cost and safety"], ["efc0341216", "Redox reaction", "A reaction in which oxidation and reduction occur simultaneously"], ["acdddc4c41", "Oxidation", "Gain of oxygen; loss of electrons; increase in oxidation number"], ["255231517c", "Reduction", "Loss of oxygen; gain of electrons; decrease in oxidation number"], ["f9c5e0d489", "Oxidation number", "A signed number describing the degree of oxidation of an atom"], ["c723711143", "Oxidising agent", "A substance that oxidises another substance and is itself reduced"], ["9d4ef4285e", "Reducing agent", "A substance that reduces another substance and is itself oxidised"], ["c40dbd541a", "Half-equation", "An equation showing only the electron loss or only the electron gain"]], "checks": [], "facts": [["f5d4d5c97e", "A chemical change makes a new substance; a physical change does not. That is the whole definition. Reversibility, colour and energy are clues, not the test — a reversible chemical change is still a chemical change"], ["0663dde2b1", "Particles must collide to react, and they must collide with at least a minimum energy — the activation energy — for the collision to do anything. Every rate fact in this unit is an answer to one of two questions: how often do they collide, and what fraction of those collisions has enough energy?"], ["5bbff61115", "Rate and yield are different questions. How fast a reaction goes is set by the conditions; how much product it eventually makes is set by how much reactant there was. A steeper graph and a higher graph mean different things, and a catalyst changes only the first"], ["82831701b4", "A catalyst speeds a reaction up by offering a route with a lower activation energy, and is chemically unchanged at the end. It never makes more product, and it never makes the particles move faster"], ["54cfaad6a9", "In a closed system, a reversible reaction reaches equilibrium: the forward and reverse reactions are still running, at equal rates, so the concentrations stop changing. Change a condition and the position shifts to oppose that change"], ["db09fe18b8", "Oxidation and reduction always happen together. One substance cannot lose electrons unless another gains them. Whether you track oxygen, electrons, or oxidation numbers, you are looking at the same event from three angles"]]}]};
+// Science Arcade engine. Data comes from tools/build_arcade.py (the unit Core Notes).
+// Everything runs in the browser; progress is saved in localStorage, with a save code as backup.
+"use strict";
+
+// ───────────────────────── state ─────────────────────────
+const KEY = "science-arcade:" + DATA.grade;
+const TODAY = () => new Date().toISOString().slice(0, 10);
+const BLANK = {
+  name: "", xp: 0, coins: 0, box: {}, right: 0, answered: 0, missions: 0, lastMission: "",
+  streak: 0, owned: ["none", "teal"], hat: "none", colour: "teal", badges: [], unitsDone: {},
+  settings: { size: 19, speak: false, calm: false, sound: true, dark: false },
+};
+let S = load();
+function load() {
+  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) return Object.assign({}, BLANK, s, { settings: Object.assign({}, BLANK.settings, s.settings) }); } catch (e) {}
+  return JSON.parse(JSON.stringify(BLANK));
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+// ───────────────────────── helpers ─────────────────────────
+const $app = document.getElementById("app");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const rnd = n => Math.floor(Math.random() * n);
+const pick = a => a[rnd(a.length)];
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const level = () => Math.floor(Math.sqrt(S.xp / 40)) + 1;
+const xpFor = l => 40 * (l - 1) * (l - 1);
+function applySettings() {
+  document.documentElement.style.setProperty("--fs", S.settings.size + "px");
+  document.body.classList.toggle("calm", S.settings.calm);
+  document.documentElement.dataset.theme = S.settings.dark ? "dark" : "light";
+}
+function speak(text) {
+  try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 0.9; u.lang = "en-GB"; speechSynthesis.speak(u); } catch (e) {}
+}
+const say = t => `<button class="speak" data-say="${esc(t)}" aria-label="Read aloud">🔊 Read</button>`;
+let actx;
+function beep(good) {
+  if (!S.settings.sound) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const notes = good ? [523, 659, 784] : [330, 262];
+    notes.forEach((f, i) => {
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = "sine"; o.frequency.value = f; o.connect(g); g.connect(actx.destination);
+      const t = actx.currentTime + i * 0.09; g.gain.setValueAtTime(0.08, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      o.start(t); o.stop(t + 0.26);
+    });
+  } catch (e) {}
+}
+function confetti() {
+  if (S.settings.calm) return;
+  const d = document.createElement("div"); d.className = "confetti";
+  const cols = ["#2f6f9f", "#2e8b57", "#d99a00", "#7b5ea7", "#e4572e"];
+  for (let i = 0; i < 60; i++) { const b = document.createElement("i"); b.style.left = rnd(100) + "vw"; b.style.background = pick(cols); b.style.animationDelay = (Math.random() * 0.6) + "s"; d.appendChild(b); }
+  document.body.appendChild(d); setTimeout(() => d.remove(), 2600);
+}
+document.addEventListener("click", e => { const b = e.target.closest("[data-say]"); if (b) { e.stopPropagation(); speak(b.dataset.say); } }, true);
+
+// ───────────────────────── the pet ─────────────────────────
+const COLOURS = { teal: "#3aa38f", sky: "#4a90d9", sun: "#f2b705", berry: "#c2477b", grape: "#7b5ea7", lime: "#7cb342", coral: "#ef6f5e", night: "#34495e", rainbow: "url(#rb)" };
+const HATS = { none: "", cap: "🧢", crown: "👑", top: "🎩", grad: "🎓", helmet: "⛑️", bow: "🎀", flower: "🌼", goggles: "🥽", star: "⭐", rocket: "🚀", dino: "🦖" };
+const SHOP = [
+  ["colour", "sky", "Sky blue", 20], ["colour", "sun", "Sunshine", 20], ["colour", "berry", "Berry", 30], ["colour", "grape", "Grape", 30],
+  ["colour", "lime", "Lime", 30], ["colour", "coral", "Coral", 40], ["colour", "night", "Midnight", 50], ["colour", "rainbow", "Rainbow", 150],
+  ["hat", "cap", "Cap", 25], ["hat", "bow", "Bow", 25], ["hat", "flower", "Flower", 30], ["hat", "goggles", "Lab goggles", 40],
+  ["hat", "helmet", "Safety helmet", 40], ["hat", "grad", "Graduate", 60], ["hat", "top", "Top hat", 60], ["hat", "star", "Star", 80],
+  ["hat", "rocket", "Rocket", 100], ["hat", "crown", "Crown", 150], ["hat", "dino", "Dino friend", 200],
+];
+function petSVG(size = 120, mood = "happy") {
+  const c = COLOURS[S.colour] || COLOURS.teal, grow = Math.min(1 + (level() - 1) * 0.04, 1.4);
+  const mouth = mood === "wow" ? '<ellipse cx="60" cy="80" rx="7" ry="8" fill="#1f2a37"/>' : '<path d="M46 76 Q60 90 74 76" stroke="#1f2a37" stroke-width="4" fill="none" stroke-linecap="round"/>';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 120 120" class="bob" aria-hidden="true">
+    <defs><linearGradient id="rb" x1="0" x2="1"><stop offset="0" stop-color="#ef6f5e"/><stop offset=".35" stop-color="#f2b705"/><stop offset=".7" stop-color="#3aa38f"/><stop offset="1" stop-color="#7b5ea7"/></linearGradient></defs>
+    <g transform="translate(60 66) scale(${grow}) translate(-60 -66)">
+      <ellipse cx="60" cy="112" rx="30" ry="5" fill="#000" opacity=".12"/>
+      <path d="M20 70 C20 35 40 22 60 22 C80 22 100 35 100 70 C100 98 82 108 60 108 C38 108 20 98 20 70Z" fill="${c}"/>
+      <circle cx="46" cy="60" r="11" fill="#fff"/><circle cx="74" cy="60" r="11" fill="#fff"/>
+      <circle cx="48" cy="62" r="5.5" fill="#1f2a37"/><circle cx="76" cy="62" r="5.5" fill="#1f2a37"/>
+      <circle cx="50" cy="59" r="2" fill="#fff"/><circle cx="78" cy="59" r="2" fill="#fff"/>
+      <circle cx="34" cy="76" r="5" fill="#ff8fa3" opacity=".6"/><circle cx="86" cy="76" r="5" fill="#ff8fa3" opacity=".6"/>
+      ${mouth}
+      <text x="60" y="26" font-size="34" text-anchor="middle">${HATS[S.hat] || ""}</text>
+    </g></svg>`;
+}
+
+// ───────────────────────── the question pool ─────────────────────────
+const UNITS = DATA.units;
+const unitById = id => UNITS.find(u => u.id === id);
+const allTerms = UNITS.flatMap(u => u.terms.map(t => ({ id: t[0], term: t[1], meaning: t[2], unit: u.id })));
+const box = id => S.box[id] || 0;
+function mark(id, ok) { S.box[id] = ok ? Math.min(box(id) + 1, 5) : 0; S.answered++; if (ok) S.right++; }
+function mastery(u) {
+  const ids = u.terms.map(t => t[0]).concat(u.checks.map(c => c[0]));
+  if (!ids.length) return 0;
+  return Math.round(100 * ids.reduce((a, id) => a + box(id), 0) / (ids.length * 5));
+}
+function weakFirst(items, key = x => x.id) {
+  return shuffle(items).sort((a, b) => box(key(a)) - box(key(b)) + (Math.random() - 0.5) * 1.5);
+}
+function stripTerm(meaning, term) {
+  // Hide the answer if the clue gives it away — the whole term only, never part of another word.
+  const w = term.split(" (")[0].trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return w.length > 3 ? meaning.replace(new RegExp("\\b" + w + "\\b", "ig"), "_____") : meaning;
+}
+function qWhichWord(t) {
+  const pool = allTerms.filter(x => x.id !== t.id && x.term.toLowerCase() !== t.term.toLowerCase());
+  const same = shuffle(pool.filter(x => x.unit === t.unit)), other = shuffle(pool.filter(x => x.unit !== t.unit));
+  const wrong = same.concat(other).slice(0, 3).map(x => x.term);
+  return { id: t.id, kind: "mc", unit: t.unit, prompt: "Which word matches this meaning?", detail: stripTerm(t.meaning, t.term),
+    options: shuffle([t.term, ...wrong]), answer: t.term, explain: `${t.term} — ${t.meaning}` };
+}
+function qWhatMeans(t) {
+  const pool = allTerms.filter(x => x.id !== t.id);
+  const same = shuffle(pool.filter(x => x.unit === t.unit)), other = shuffle(pool.filter(x => x.unit !== t.unit));
+  const wrong = same.concat(other).slice(0, 3).map(x => x.meaning);
+  return { id: t.id, kind: "mc", unit: t.unit, prompt: `What does "${t.term}" mean?`, options: shuffle([t.meaning, ...wrong]),
+    answer: t.meaning, explain: `${t.term} — ${t.meaning}` };
+}
+function buildable(t) { const w = t.term.split(" (")[0].trim(); return /^[A-Za-z][A-Za-z -]{2,13}$/.test(w) ? w : null; }
+function qBuild(t) { const w = buildable(t); return { id: t.id, kind: "build", unit: t.unit, prompt: "Build the word that matches:", detail: stripTerm(t.meaning, t.term), answer: w, explain: `${w} — ${t.meaning}` }; }
+function qSelf(u, c) { return { id: c[0], kind: "self", unit: u.id, prompt: c[1], answer: c[2] }; }
+function termQuestion(t) {
+  const r = Math.random();
+  if (buildable(t) && r < 0.3) return qBuild(t);
+  return r < 0.65 ? qWhichWord(t) : qWhatMeans(t);
+}
+
+// ───────────────────── number puzzles (endless), per unit ─────────────────────
+const n4 = (ans, fmt = x => String(x), spread = [1, 2, 3, -1, -2, 5, 10]) => {
+  const set = new Set([fmt(ans)]);
+  for (const d of shuffle(spread)) { if (set.size >= 4) break; const v = ans + d; if (v >= 0) set.add(fmt(v)); }
+  let k = 11; while (set.size < 4) set.add(fmt(ans + k++));
+  return shuffle([...set]);
+};
+const mc = (unit, prompt, answer, options, explain) => ({ id: "gen:" + unit, kind: "mc", unit, prompt, options, answer: String(answer), explain, gen: true });
+const ELEMENTS = [null, "hydrogen", "helium", "lithium", "beryllium", "boron", "carbon", "nitrogen", "oxygen", "fluorine", "neon", "sodium", "magnesium", "aluminium", "silicon", "phosphorus", "sulfur", "chlorine", "argon", "potassium", "calcium"];
+const MASS = [0, 1, 4, 7, 9, 11, 12, 14, 16, 19, 20, 23, 24, 27, 28, 31, 32, 35, 40, 39, 40];
+function eConfig(z) { const s = []; let left = z; for (const cap of [2, 8, 8, 2]) { if (left <= 0) break; s.push(Math.min(cap, left)); left -= cap; } return s.join("."); }
+function wrongConfigs(z) {
+  const right = eConfig(z), out = new Set([right]); const parts = right.split(".").map(Number);
+  if (parts.length > 1) { const a = parts.slice(); a[a.length - 1]++; out.add(a.join(".")); const b = parts.slice(); b[0] = 8; out.add(b.join(".")); }
+  out.add(eConfig(Math.max(1, z - 1))); out.add(eConfig(Math.min(20, z + 1))); out.add(String(z));
+  return shuffle([...out]).filter(x => x !== right).slice(0, 3).concat(right);
+}
+const GENERATORS = {
+  "g06-u01": [
+    () => { const lv = ["cell", "tissue", "organ", "organ system", "organism"]; const i = rnd(4);
+      return mc("g06-u01", `Smallest to biggest: what comes straight after "${lv[i]}"?`, lv[i + 1], shuffle(lv.filter(x => x !== lv[i])), "cell → tissue → organ → organ system → organism"); },
+    () => { const parts = [["cell wall", "plant cells only"], ["chloroplast", "plant cells only"], ["sap vacuole", "plant cells only"], ["cell membrane", "plant and animal cells"], ["nucleus", "plant and animal cells"], ["cytoplasm", "plant and animal cells"], ["mitochondria", "plant and animal cells"]];
+      const [p, a] = pick(parts); return mc("g06-u01", `Where do you find the ${p}?`, a, ["plant cells only", "plant and animal cells", "animal cells only"], `The ${p} is in ${a}. Plant cells have three extras: cell wall, sap vacuole, chloroplasts.`); },
+    () => { const jobs = [["nucleus", "controls the activities of the cell"], ["cell membrane", "controls what goes in and out"], ["mitochondria", "release energy from food"], ["chloroplast", "makes food by photosynthesis"], ["cell wall", "holds the cell in shape"], ["cytoplasm", "where chemical reactions happen"], ["sap vacuole", "stores cell sap and keeps the cell firm"]];
+      const [p, j] = pick(jobs); return mc("g06-u01", `What is the job of the ${p}?`, j, shuffle([j, ...shuffle(jobs.filter(x => x[0] !== p)).slice(0, 3).map(x => x[1])]), `${p}: ${j}.`); },
+    () => { const cells = [["red blood cell", "carries oxygen"], ["neurone", "carries electrical signals"], ["ciliated cell", "moves mucus out of the airways"], ["root hair cell", "absorbs water and minerals"], ["palisade cell", "makes food by photosynthesis"]];
+      const [c, j] = pick(cells); return mc("g06-u01", `What is the job of a ${c}?`, j, shuffle([j, ...shuffle(cells.filter(x => x[0] !== c)).slice(0, 3).map(x => x[1])]), `A ${c} ${j}.`); },
+  ],
+  "g07-u01": [
+    () => { const s = pick([10, 15, 20, 30]), per = 12 + rnd(24), count = Math.round(per * s / 60); const ans = Math.round(count * 60 / s);
+      return mc("g07-u01", `Aisha counts ${count} breaths in ${s} seconds. What is her breathing rate in breaths per minute?`, ans, n4(ans, x => String(x), [count, -count, 2, -2, 4, 6].map(d => d)), `There are ${60 / s} lots of ${s} seconds in a minute: ${count} × ${60 / s} = ${ans}.`); },
+    () => { const b = 20 + rnd(20), vals = [b, b + 2 + rnd(3), b - 1 - rnd(3)].map(x => x * 100); const sum = vals.reduce((a, c) => a + c, 0);
+      if (sum % 3) vals[2] += 3 - (sum % 3) === 3 ? 0 : 0; const mean = Math.round(vals.reduce((a, c) => a + c, 0) / 3);
+      return mc("g07-u01", `Three breath volumes: ${vals.join(" cm³, ")} cm³. What is the mean, to the nearest whole number?`, mean + " cm³", n4(mean, x => x + " cm³", [100, -100, 50, -50, 200]), `Add them (${vals.reduce((a, c) => a + c, 0)}) and divide by 3.`); },
+    () => { const path = ["nose or mouth", "larynx", "trachea", "bronchi", "bronchioles", "air sacs"]; const i = rnd(5);
+      return mc("g07-u01", `Breathing in: where does the air go straight after the ${path[i]}?`, path[i + 1], shuffle([path[i + 1], ...shuffle(path.filter((x, k) => k !== i && k !== i + 1)).slice(0, 3)]), path.join(" → ")); },
+    () => { const q = pick([["glucose + oxygen → carbon dioxide + ______", "water"], ["glucose + ______ → carbon dioxide + water", "oxygen"], ["______ + oxygen → carbon dioxide + water", "glucose"], ["glucose + oxygen → ______ + water", "carbon dioxide"]]);
+      return mc("g07-u01", `Complete the word equation for aerobic respiration: ${q[0]}`, q[1], shuffle([q[1], ...shuffle(["water", "oxygen", "glucose", "carbon dioxide", "energy", "nitrogen"].filter(x => x !== q[1])).slice(0, 3)]), "glucose + oxygen → carbon dioxide + water. Energy is released, but it is not a substance."); },
+  ],
+  "g07-u02": [
+    () => { const vol = pick([20, 25, 40, 50, 80]), conc = pick([5, 8, 10, 12, 15, 20]), mass = conc * vol / 100;
+      return mc("g07-u02", `${mass} g of salt is dissolved to make ${vol} cm³ of solution. What is the concentration in g / 100 cm³?`, conc, n4(conc, x => String(x), [mass - conc, 5, -3, 10, 2]), `${mass} ÷ ${vol} × 100 = ${conc} g / 100 cm³.`); },
+    () => { const front = pick([40, 50, 60, 80, 100]), rf = pick([0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 0.8]), spot = Math.round(front * rf);
+      const ans = +(spot / front).toFixed(2);
+      return mc("g07-u02", `A spot is ${spot} mm from the start line. The solvent front is ${front} mm from the start line. What is the Rf value?`, ans, n4(ans, x => String(+x.toFixed(2)), [0.1, -0.1, 0.2, -0.05, 0.15]).map(String), `Rf = distance of spot ÷ distance of solvent front = ${spot} ÷ ${front} = ${ans}.`); },
+  ],
+  "g08-u01": [
+    () => { const b = 15 + rnd(30), vals = [b + 1, b - 2, b + 1 + rnd(2)]; const tot = vals.reduce((a, c) => a + c, 0); const mean = +(tot / 3).toFixed(1);
+      return mc("g08-u01", `Bubble counts in one minute: ${vals.join(", ")}. What is the mean?`, mean, n4(mean, x => String(+x.toFixed(1)), [1, -1, 3, 2.5]).map(String), `${vals.join(" + ")} = ${tot}; ${tot} ÷ 3 = ${mean}.`); },
+    () => { const y = pick([10, 20, 30, 40, 50, 100]), ans = 3 * y / 10;
+      return mc("g08-u01", `Sea level rises about 3 mm a year. How much would it rise in ${y} years, in cm?`, ans + " cm", n4(ans, x => x + " cm", [3 * y / 100 - ans, ans * 9, 1, -1, 2]), `3 × ${y} = ${3 * y} mm = ${ans} cm.`); },
+    () => { const q = pick([["carbon dioxide + water → glucose + ______", "oxygen"], ["carbon dioxide + ______ → glucose + oxygen", "water"], ["______ + water → glucose + oxygen", "carbon dioxide"], ["carbon dioxide + water → ______ + oxygen", "glucose"]]);
+      return mc("g08-u01", `Complete the word equation for photosynthesis: ${q[0]}`, q[1], shuffle([q[1], ...shuffle(["oxygen", "water", "carbon dioxide", "glucose", "light", "chlorophyll"].filter(x => x !== q[1])).slice(0, 3)]), "carbon dioxide + water → glucose + oxygen. Light and chlorophyll are needed, but they are not reactants."); },
+    () => { const p = pick([["photosynthesis", "removes carbon dioxide from the air"], ["respiration", "releases carbon dioxide into the air"], ["combustion", "releases carbon dioxide into the air"], ["decomposition", "releases carbon dioxide into the air"]]);
+      return mc("g08-u01", `In the carbon cycle, what does ${p[0]} do?`, p[1], ["removes carbon dioxide from the air", "releases carbon dioxide into the air", "has no effect on carbon dioxide"], "Only photosynthesis takes carbon dioxide out of the air. Respiration, decomposition and combustion put it back."); },
+  ],
+};
+const atomGens = u => [
+  () => { const z = 1 + rnd(20); return mc(u, `What is the electronic structure of ${ELEMENTS[z]} (atomic number ${z})?`, eConfig(z), wrongConfigs(z), `Fill the shells 2, then 8, then 8: ${ELEMENTS[z]} is ${eConfig(z)}.`); },
+  () => { const z = 3 + rnd(18); const m = MASS[z], n = m - z; return mc(u, `${ELEMENTS[z][0].toUpperCase() + ELEMENTS[z].slice(1)} has atomic number ${z} and mass number ${m}. How many neutrons?`, n, n4(n, String, [z - n, m - n, 1, -1, 2].filter(d => d)), `neutrons = mass number − atomic number = ${m} − ${z} = ${n}.`); },
+  () => { const z = [3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 19, 20][rnd(16)], cfg = eConfig(z), sh = cfg.split("."), grp = +sh[sh.length - 1], per = sh.length;
+    const ans = `Group ${grp}, Period ${per}`, opts = new Set([ans, `Group ${per}, Period ${grp}`, `Group ${grp}, Period ${per + 1}`, `Group ${Math.min(grp + 1, 8)}, Period ${per}`]);
+    return mc(u, `An element has the electronic structure ${cfg}. Where is it in the Periodic Table?`, ans, shuffle([...opts]).slice(0, 4), `Group = outer electrons (${grp}). Period = shells with electrons (${per}).`); },
+];
+GENERATORS["g08-u02"] = atomGens("g08-u02");
+GENERATORS["g9-igcse1-u02"] = atomGens("g9-igcse1-u02");
+GENERATORS["g10-igcse2-u08"] = atomGens("g10-igcse2-u08");
+GENERATORS["g9-igcse1-u03"] = [
+  () => { const f = pick([["H₂O", 18, "2 × 1 + 16"], ["CO₂", 44, "12 + 2 × 16"], ["NaCl", 58.5, "23 + 35.5"], ["MgO", 40, "24 + 16"], ["CH₄", 16, "12 + 4 × 1"], ["NH₃", 17, "14 + 3 × 1"], ["CaCO₃", 100, "40 + 12 + 3 × 16"], ["H₂SO₄", 98, "2 × 1 + 32 + 4 × 16"], ["NaOH", 40, "23 + 16 + 1"], ["O₂", 32, "2 × 16"]]);
+    return mc("g9-igcse1-u03", `Calculate the relative formula mass (Mᵣ) of ${f[0]}. (Aᵣ: H 1, C 12, N 14, O 16, Na 23, Mg 24, S 32, Cl 35.5, Ca 40)`, f[1], n4(f[1], String, [16, -16, 12, 2, -1]), `Mᵣ = ${f[2]} = ${f[1]}.`); },
+  () => { const f = pick([[18, "H₂O", 36], [44, "CO₂", 88], [40, "NaOH", 20], [100, "CaCO₃", 50], [32, "O₂", 64], [58.5, "NaCl", 117]]); const moles = +(f[2] / f[0]).toFixed(2);
+    return mc("g9-igcse1-u03", `How many moles are in ${f[2]} g of ${f[1]} (Mᵣ = ${f[0]})?`, moles, n4(moles, x => String(+x.toFixed(2)), [moles, 1, -0.5, 0.5, 2]).map(String), `moles = mass ÷ Mᵣ = ${f[2]} ÷ ${f[0]} = ${moles}.`); },
+];
+
+function genQuestion(unitId) { const g = GENERATORS[unitId]; if (!g) return null; for (let i = 0; i < 5; i++) { try { const q = pick(g)(); if (q && q.options && q.options.includes(q.answer)) { q.options = [...new Set(q.options)]; return q; } } catch (e) {} } return null; }
+const hasGen = id => !!GENERATORS[id];
+
+// ───────────────────── building a round ─────────────────────
+function roundFor(units, n = 10, mode = "mix") {
+  const qs = [];
+  const terms = weakFirst(allTerms.filter(t => units.includes(t.unit)));
+  const checks = weakFirst(UNITS.filter(u => units.includes(u.id)).flatMap(u => u.checks.map(c => qSelf(u, c))));
+  const genUnits = units.filter(hasGen);
+  let ti = 0, ci = 0;
+  for (let i = 0; i < n; i++) {
+    const r = Math.random();
+    let q = null;
+    if (mode === "numbers" || (genUnits.length && r < 0.25)) q = genQuestion(pick(genUnits.length ? genUnits : units));
+    else if (mode !== "numbers" && checks.length && r < 0.4 && ci < checks.length) q = checks[ci++];
+    if (!q && terms.length) q = termQuestion(terms[ti++ % terms.length]);
+    if (!q && checks.length) q = checks[ci++ % checks.length];
+    if (q) qs.push(q);
+  }
+  return qs;
+}
+
+// ───────────────────── screens ─────────────────────
+function header(back) {
+  const l = level(), pct = Math.round(100 * (S.xp - xpFor(l)) / (xpFor(l + 1) - xpFor(l)));
+  return `<div class="bar">
+    ${back ? `<button class="ghost" data-go="${back}">⬅ Back</button>` : `<strong>🔬 Science Arcade · ${esc(DATA.label)}</strong>`}
+    <div class="row"><span class="chip">⭐ Level ${l}</span><span class="chip">🪙 ${S.coins}</span><span class="chip">🔥 ${S.streak} day${S.streak === 1 ? "" : "s"}</span></div>
+  </div><div class="progress" title="XP to next level"><i style="width:${pct}%"></i></div>`;
+}
+function go(screen, arg) { speechSynthesis && speechSynthesis.cancel && speechSynthesis.cancel(); SCREENS[screen](arg); window.scrollTo(0, 0); }
+$app.addEventListener("click", e => { const b = e.target.closest("[data-go]"); if (b) go(b.dataset.go, b.dataset.arg); });
+
+const SCREENS = {
+  home() {
+    if (!S.name) return SCREENS.hello();
+    const done = S.lastMission === TODAY();
+    const cheer = pick(["Ready for some science?", "Your buddy missed you!", "Let's learn something cool.", "Every answer makes your buddy grow."]);
+    $app.innerHTML = header() + `
+      <div class="card pet">${petSVG(130)}<div><h1>Hi, ${esc(S.name)}!</h1><p class="muted">${cheer}</p></div></div>
+      <button class="big primary" data-go="mission"><span class="ico">🚀</span>${done ? "Bonus mission" : "Today's mission"}<small style="color:inherit">${done ? "You finished today's mission — this one is extra practice" : "10 questions from everything you have learned"}</small></button>
+      <h2 style="margin-top:22px">Your worlds</h2>
+      <div class="grid">${UNITS.map(u => `<button class="big" data-go="world" data-arg="${u.id}"><div class="row" style="flex-wrap:nowrap"><div class="ring" style="--p:${mastery(u)}"><span>${mastery(u)}%</span></div><div>Unit ${u.n}<small>${esc(u.title)}</small></div></div></button>`).join("")}</div>
+      <div class="grid" style="margin-top:18px">
+        <button class="big" data-go="shop"><span class="ico">🛍️</span>Buddy shop<small>Spend your coins</small></button>
+        <button class="big" data-go="badges"><span class="ico">🏅</span>Badges<small>${S.badges.length} of ${BADGES.length} collected</small></button>
+        <button class="big" data-go="settings"><span class="ico">⚙️</span>Settings<small>Text size, reading aloud, save code</small></button>
+      </div>`;
+  },
+  hello() {
+    $app.innerHTML = `<div class="card center">${petSVG(150)}<h1>Welcome to the Science Arcade!</h1>
+      <p>This is your science buddy. Answer questions to help it grow, earn coins, and dress it up.</p>
+      <p><label>What is your first name?<br><input id="nm" maxlength="20" style="font:inherit;padding:12px;border-radius:12px;border:2px solid var(--line);margin-top:8px;width:min(320px,90%)"></label></p>
+      <button class="primary" id="startbtn">Let's go! 🚀</button></div>`;
+    const f = () => { S.name = (document.getElementById("nm").value || "Scientist").trim(); save(); go("home"); };
+    document.getElementById("startbtn").onclick = f;
+    document.getElementById("nm").onkeydown = e => { if (e.key === "Enter") f(); };
+  },
+  world(id) {
+    const u = unitById(id);
+    const acts = [
+      ["play", "🎯", "Quiz", "10 questions about this unit"],
+      u.terms.length >= 4 && ["match", "🧩", "Match up", "Join each word to its meaning"],
+      u.terms.length && ["flash", "🃏", "Flashcards", `${u.terms.length} words to learn`],
+      u.terms.some(buildable) && ["builder", "🔤", "Word builder", "Spell the science word"],
+      hasGen(id) && ["numbers", "🔢", "Number lab", "Endless puzzles — they never run out"],
+      u.checks.length && ["challenge", "🏆", "Challenge cards", `${u.checks.length} test-style questions`],
+      u.facts.length && ["ideas", "💡", "Big ideas", "The facts everything else is built on"],
+    ].filter(Boolean);
+    $app.innerHTML = header("home") + `<h1>Unit ${u.n}: ${esc(u.title)}</h1>
+      <div class="row"><div class="ring" style="--p:${mastery(u)}"><span>${mastery(u)}%</span></div><p class="muted" style="margin:0">Mastery grows each time you get something right. It drops back if you forget, so come back and practise!</p></div>
+      <div class="grid" style="margin-top:14px">${acts.map(a => `<button class="big" data-go="${a[0]}" data-arg="${id}"><span class="ico">${a[1]}</span>${a[2]}<small>${a[3]}</small></button>`).join("")}</div>`;
+  },
+  mission() { play(roundFor(UNITS.map(u => u.id), 10), { title: "Today's mission", back: "home", mission: true }); },
+  play(id) { play(roundFor([id], 10), { title: "Quiz · " + unitById(id).title, back: "world", arg: id, unit: id }); },
+  numbers(id) { play(Array.from({ length: 10 }, () => genQuestion(id)).filter(Boolean), { title: "Number lab · " + unitById(id).title, back: "world", arg: id, unit: id }); },
+  builder(id) { play(weakFirst(allTerms.filter(t => t.unit === id && buildable(t))).slice(0, 8).map(qBuild), { title: "Word builder", back: "world", arg: id, unit: id }); },
+  challenge(id) { const u = unitById(id); play(weakFirst(u.checks.map(c => qSelf(u, c))).slice(0, 6), { title: "Challenge cards", back: "world", arg: id, unit: id }); },
+  flash(id) { flashcards(unitById(id).terms.map(t => [t[1], t[2], t[0]]), id, "Flashcards"); },
+  ideas(id) { flashcards(unitById(id).facts.map((f, i) => ["Big idea " + (i + 1), f[1], f[0]]), id, "Big ideas"); },
+  match(id) { matchGame(id); },
+  shop() {
+    $app.innerHTML = header("home") + `<div class="card pet">${petSVG(120)}<div><h1>Buddy shop</h1><p class="muted">You have 🪙 ${S.coins}. Tap something you own to wear it.</p></div></div>
+      <h2>Colours</h2><div class="shop">${shopRow("colour")}</div><h2>Hats and friends</h2><div class="shop">${shopRow("hat")}</div>`;
+    $app.querySelectorAll("[data-buy]").forEach(b => b.onclick = () => {
+      const [kind, key, , price] = SHOP.find(s => s[1] === b.dataset.buy) || [b.dataset.kind, b.dataset.buy, "", 0];
+      if (!S.owned.includes(key)) { if (S.coins < price) { b.classList.add("shake"); setTimeout(() => b.classList.remove("shake"), 400); return; } S.coins -= price; S.owned.push(key); beep(true); }
+      if (kind === "hat") S.hat = key; else S.colour = key; checkBadges(); save(); go("shop");
+    });
+  },
+  badges() {
+    $app.innerHTML = header("home") + `<h1>Badges</h1><p class="muted">${S.right} correct answers so far.</p><div>${BADGES.map(b => `<div class="badge ${S.badges.includes(b[0]) ? "got" : ""}"><span class="em">${b[1]}</span><strong>${b[2]}</strong><span>${b[3]}</span></div>`).join("")}</div>`;
+  },
+  settings() {
+    const st = S.settings;
+    $app.innerHTML = header("home") + `<h1>Settings</h1>
+      <div class="card"><label>Text size <input type="range" min="16" max="28" value="${st.size}" id="sz"></label></div>
+      <div class="card"><label><input type="checkbox" id="sp" ${st.speak ? "checked" : ""}> Read every question aloud</label><br>
+        <label><input type="checkbox" id="snd" ${st.sound ? "checked" : ""}> Sounds</label><br>
+        <label><input type="checkbox" id="calm" ${st.calm ? "checked" : ""}> Calm mode (no moving pictures or confetti)</label><br>
+        <label><input type="checkbox" id="dk" ${st.dark ? "checked" : ""}> Dark colours</label></div>
+      <div class="card"><h2>Your name</h2><input id="nm" value="${esc(S.name)}" maxlength="20" style="font:inherit;padding:10px;border-radius:12px;border:2px solid var(--line)"></div>
+      <div class="card"><h2>Save code</h2><p class="muted">Your progress is saved on this computer. To move it to another computer, copy this code, then paste it there.</p>
+        <textarea id="code" rows="3" style="width:100%;font:14px monospace" readonly>${btoa(unescape(encodeURIComponent(JSON.stringify(S))))}</textarea>
+        <div class="row"><button class="ghost" id="copy">Copy code</button><button class="ghost" id="load">Load a code</button></div></div>
+      <p class="muted">Built ${esc(DATA.built)} · ${UNITS.length} unit${UNITS.length === 1 ? "" : "s"} · ${esc(DATA.strap)}</p>`;
+    const upd = () => { st.size = +sz.value; st.speak = sp.checked; st.sound = snd.checked; st.calm = calm.checked; st.dark = dk.checked; S.name = nm.value.trim() || S.name; applySettings(); save(); };
+    const [sz, sp, snd, calm, dk, nm] = ["sz", "sp", "snd", "calm", "dk", "nm"].map(i => document.getElementById(i));
+    [sz, sp, snd, calm, dk, nm].forEach(el => el.oninput = el.onchange = upd);
+    document.getElementById("copy").onclick = () => { const t = document.getElementById("code"); t.select(); try { navigator.clipboard.writeText(t.value); } catch (e) { document.execCommand("copy"); } };
+    document.getElementById("load").onclick = () => { const c = prompt("Paste your save code:"); if (!c) return; try { const s = JSON.parse(decodeURIComponent(escape(atob(c.trim())))); S = Object.assign({}, BLANK, s); save(); applySettings(); go("home"); } catch (e) { alert("That code did not work. Check you copied all of it."); } };
+  },
+};
+function shopRow(kind) {
+  const base = kind === "colour" ? [["colour", "teal", "Teal", 0]] : [["hat", "none", "No hat", 0]];
+  return base.concat(SHOP.filter(s => s[0] === kind)).map(([k, key, name, price]) => {
+    const own = S.owned.includes(key) || price === 0, on = (k === "hat" ? S.hat : S.colour) === key;
+    const em = k === "hat" ? (HATS[key] || "🙂") : `<span style="display:inline-block;width:1em;height:1em;border-radius:50%;background:${key === "rainbow" ? "linear-gradient(90deg,#ef6f5e,#f2b705,#3aa38f,#7b5ea7)" : COLOURS[key]}"></span>`;
+    return `<button data-buy="${key}" data-kind="${k}" class="${on ? "on" : ""}"><span class="em">${em}</span>${name}<br><small>${on ? "wearing" : own ? "owned" : "🪙 " + price}</small></button>`;
+  }).join("");
+}
+
+// ───────────────────── the round player ─────────────────────
+function play(qs, opt) {
+  if (!qs.length) { $app.innerHTML = header(opt.back) + `<div class="card">Nothing here yet — try another activity!</div>`; return; }
+  let i = 0, score = 0; const res = [];
+  const backArgs = `data-go="${opt.back}" ${opt.arg ? `data-arg="${opt.arg}"` : ""}`;
+  function show() {
+    const q = qs[i];
+    const u = unitById(q.unit);
+    const dots = qs.map((_, k) => `<b class="${k < i ? (res[k] ? "ok" : "no") : k === i ? "now" : ""}"></b>`).join("");
+    let body = "";
+    if (q.kind === "mc") body = `<div class="prompt">${esc(q.prompt)} ${say(q.prompt + " " + (q.detail || "") + " " + q.options.join(". "))}</div>${q.detail ? `<div class="card" style="font-size:1.1em">${esc(q.detail)}</div>` : ""}<div id="opts">${q.options.map(o => `<button class="opt">${esc(o)}</button>`).join("")}</div>`;
+    else if (q.kind === "build") body = `<div class="prompt">${esc(q.prompt)} ${say(q.detail)}</div><div class="card" style="font-size:1.1em">${esc(q.detail)}</div>
+      <p class="muted">Tap the letters in order. It has ${q.answer.replace(/[ -]/g, "").length} letters.</p><div class="slot" id="slot"></div>
+      <div class="tiles" id="tiles">${shuffle(q.answer.replace(/[ -]/g, "").split("")).map((c, k) => `<button class="tile" data-k="${k}">${esc(c)}</button>`).join("")}</div>
+      <div class="row"><button class="ghost" id="hint">💡 Hint</button><button class="ghost" id="undo" hidden>⌫</button></div>`;
+    else body = `<div class="prompt">${esc(q.prompt)} ${say(q.prompt)}</div><p class="muted">Think of your answer — say it or write it down. Then check.</p>
+      <button class="primary" id="reveal">Show the answer</button><div id="ans"></div>`;
+    $app.innerHTML = `<div class="bar"><button class="ghost" ${backArgs}>✖ Stop</button><strong>${esc(opt.title)}</strong><span class="chip">${i + 1} / ${qs.length}</span></div>
+      <div class="dots">${dots}</div>${opt.mission && u ? `<p class="muted">Unit ${u.n}: ${esc(u.title)}</p>` : ""}<div class="card pop">${body}</div><div id="fb"></div>`;
+    if (S.settings.speak) speak(q.kind === "build" ? q.detail : q.prompt + (q.detail ? ". " + q.detail : ""));
+    if (q.kind === "mc") {
+      const tries = { n: 0 };
+      $app.querySelectorAll(".opt").forEach(b => b.onclick = () => {
+        if (b.disabled) return;
+        const ok = b.textContent === q.answer;
+        if (ok) { b.classList.add("right"); finish(tries.n === 0, q); }
+        else { b.classList.add("wrong"); b.disabled = true; tries.n++; beep(false);
+          if (tries.n >= 2) { $app.querySelectorAll(".opt").forEach(x => { if (x.textContent === q.answer) x.classList.add("right"); x.disabled = true; }); finish(false, q); }
+          else fb(`Not quite — have another go! 💪`, "try"); }
+      });
+    } else if (q.kind === "build") {
+      const target = q.answer.replace(/[ -]/g, "").toLowerCase(); let typed = []; let hints = 0;
+      const slot = document.getElementById("slot"), tiles = [...document.querySelectorAll(".tile")];
+      const draw = () => { slot.innerHTML = typed.map(k => `<span class="tile" style="display:inline-grid;place-items:center">${esc(tiles[k].textContent)}</span>`).join(""); tiles.forEach((t, k) => t.classList.toggle("used", typed.includes(k))); };
+      // Guided spelling: a wrong letter is refused on the spot, and after three misses the right
+      // tile lights up — nobody can get stuck, and nothing has to be undone.
+      let misses = 0, here = 0;
+      tiles.forEach((t, k) => t.onclick = () => {
+        if (typed.includes(k)) return;
+        if (t.textContent.toLowerCase() !== target[typed.length]) {
+          misses++; here++; beep(false); t.classList.add("shake"); setTimeout(() => t.classList.remove("shake"), 400);
+          if (here >= 3) tiles.find((x, j) => !typed.includes(j) && x.textContent.toLowerCase() === target[typed.length]).style.borderColor = "var(--gold)";
+          return;
+        }
+        here = 0; tiles.forEach(x => x.style.borderColor = ""); typed.push(k); draw();
+        if (typed.length === target.length) finish(hints === 0 && misses <= 2, q);
+      });
+      document.getElementById("undo").onclick = () => { typed.pop(); draw(); };
+      document.getElementById("hint").onclick = () => { hints++; fb(`It starts with "${q.answer[0].toUpperCase()}"${hints > 1 ? ` and ends with "${q.answer.slice(-1)}"` : ""}.`, "try"); };
+    } else {
+      document.getElementById("reveal").onclick = () => {
+        document.getElementById("ans").innerHTML = `<div class="card" style="border-color:var(--good)"><strong>Answer:</strong> ${esc(q.answer)} ${say(q.answer)}</div>
+          <p>Did you get it?</p><div class="row"><button class="primary" id="yes">✅ I got it</button><button class="ghost" id="nearly">🙂 Nearly</button><button class="ghost" id="no">🔁 Not yet</button></div>`;
+        document.getElementById("reveal").remove();
+        document.getElementById("yes").onclick = () => finish(true, q, true);
+        document.getElementById("nearly").onclick = () => finish(false, q, true, true);
+        document.getElementById("no").onclick = () => finish(false, q, true);
+        if (S.settings.speak) speak("The answer is: " + q.answer);
+      };
+    }
+  }
+  function fb(msg, cls) { document.getElementById("fb").innerHTML = `<div class="feedback ${cls}">${msg}</div>`; }
+  function finish(ok, q, self, nearly) {
+    if (!q.gen) mark(q.id, ok); else { S.answered++; if (ok) S.right++; }
+    res[i] = ok; if (ok) score++;
+    const gainXp = ok ? 10 : 4, gainCoins = ok ? 3 : 1;   // effort always earns something
+    const before = level(); S.xp += gainXp; S.coins += gainCoins; save();
+    beep(ok);
+    const praise = pick(["Brilliant!", "Great job!", "You got it!", "Super scientist!", "Fantastic!", "Spot on!"]);
+    const kind = nearly ? "Good effort — you'll see this one again soon." : ok ? praise : self ? "That's OK — you'll see this one again soon, and you'll get it." : "Good try! Here is the answer:";
+    $app.querySelectorAll("#opts .opt, .tile, #undo, #hint").forEach(b => b.disabled = true);
+    document.getElementById("fb").innerHTML = `<div class="feedback ${ok ? "good" : "try"} pop">${kind} <span class="chip">+${gainXp} XP</span> <span class="chip">+${gainCoins} 🪙</span>
+      ${!ok && q.explain ? `<div style="font-weight:400;margin-top:8px">${esc(q.explain)} ${say(q.explain)}</div>` : ok && q.explain && q.gen ? `<div style="font-weight:400;margin-top:8px">${esc(q.explain)}</div>` : ""}</div>
+      <button class="primary" id="next">${i + 1 < qs.length ? "Next ➡" : "Finish 🎉"}</button>`;
+    if (level() > before) { confetti(); fb2(`🎉 Level up! Your buddy is now level ${level()}!`); }
+    const nb = document.getElementById("next"); nb.focus(); nb.onclick = () => { i++; i < qs.length ? show() : end(); };
+  }
+  function fb2(msg) { const d = document.createElement("div"); d.className = "feedback good pop"; d.textContent = msg; document.getElementById("fb").prepend(d); }
+  function end() {
+    const stars = score >= qs.length * 0.9 ? 3 : score >= qs.length * 0.6 ? 2 : 1;
+    let bonus = 5 * stars;
+    if (opt.mission) {
+      if (S.lastMission !== TODAY()) {
+        const y = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+        S.streak = S.lastMission === y ? S.streak + 1 : 1; S.lastMission = TODAY(); bonus += 20;
+      }
+      S.missions++;
+    }
+    S.coins += bonus; S.xp += bonus; save(); checkBadges();
+    if (stars === 3) confetti();
+    $app.innerHTML = header() + `<div class="card center pop">${petSVG(140, "wow")}<h1>${"⭐".repeat(stars)}${"☆".repeat(3 - stars)}</h1>
+      <h2>${score} out of ${qs.length}!</h2><p>${stars === 3 ? "Amazing work!" : stars === 2 ? "Really good — keep going!" : "Every try makes you stronger. Let's do another!"}</p>
+      <p><span class="chip">Bonus +${bonus} 🪙</span>${opt.mission && S.streak ? ` <span class="chip">🔥 ${S.streak}-day streak</span>` : ""}</p>
+      <div class="row" style="justify-content:center"><button class="primary" id="again">Play again 🔁</button><button class="ghost" data-go="home">🏠 Home</button>${opt.unit ? `<button class="ghost" data-go="world" data-arg="${opt.unit}">Unit menu</button>` : ""}</div></div>`;
+    document.getElementById("again").onclick = () => opt.mission ? go("mission") : go(opt.back === "world" ? currentActivity(opt) : "home", opt.arg);
+    if (S.settings.speak) speak(`${score} out of ${qs.length}. ${stars === 3 ? "Amazing work!" : "Well done!"}`);
+  }
+  show();
+}
+function currentActivity(opt) { const t = opt.title; return t.startsWith("Quiz") ? "play" : t.startsWith("Number") ? "numbers" : t.startsWith("Word") ? "builder" : t.startsWith("Challenge") ? "challenge" : "play"; }
+
+// ───────────────────── flashcards ─────────────────────
+function flashcards(cards, id, title) {
+  let i = 0, flipped = false; cards = weakFirst(cards, c => c[2]);
+  function show() {
+    const [front, back, cid] = cards[i];
+    $app.innerHTML = `<div class="bar"><button class="ghost" data-go="world" data-arg="${id}">⬅ Back</button><strong>${title}</strong><span class="chip">${i + 1} / ${cards.length}</span></div>
+      <button class="card flash pop" id="fc" style="width:100%"><span class="side">${flipped ? "meaning" : "tap to flip"}</span>${esc(flipped ? back : front)}</button>
+      <div class="row" style="justify-content:center">${say(flipped ? back : front)}
+        ${flipped ? `<button class="primary" id="know">✅ I know this</button><button class="ghost" id="learn">🔁 Still learning</button>` : `<button class="primary" id="flip">Flip 🔄</button>`}</div>
+      <div class="row" style="justify-content:space-between;margin-top:14px"><button class="ghost" id="prev">⬅ Previous</button><button class="ghost" id="nxt">Next ➡</button></div>`;
+    if (S.settings.speak) speak(flipped ? back : front);
+    const flip = () => { flipped = !flipped; show(); };
+    document.getElementById("fc").onclick = flip;
+    if (!flipped) document.getElementById("flip").onclick = flip;
+    else {
+      document.getElementById("know").onclick = () => { if (!title.startsWith("Big")) mark(cid, true); S.xp += 3; S.coins += 1; save(); beep(true); next(); };
+      document.getElementById("learn").onclick = () => { S.xp += 2; save(); next(); };
+    }
+    document.getElementById("prev").onclick = () => { i = (i - 1 + cards.length) % cards.length; flipped = false; show(); };
+    document.getElementById("nxt").onclick = next;
+  }
+  function next() { i = (i + 1) % cards.length; flipped = false; if (i === 0) confetti(); show(); }
+  show();
+}
+
+// ───────────────────── match up ─────────────────────
+function matchGame(id) {
+  const set = weakFirst(allTerms.filter(t => t.unit === id)).slice(0, 5);
+  const left = shuffle(set), right = shuffle(set);
+  let sel = null, done = 0, mistakes = 0;
+  $app.innerHTML = `<div class="bar"><button class="ghost" data-go="world" data-arg="${id}">⬅ Back</button><strong>Match up</strong><span class="chip" id="mc">0 / ${set.length}</span></div>
+    <p>Tap a word, then tap its meaning. ${say("Tap a word, then tap its meaning.")}</p>
+    <div class="match"><div>${left.map(t => `<button data-side="L" data-id="${t.id}" style="width:100%;margin-bottom:10px;font-weight:700">${esc(t.term)}</button>`).join("")}</div>
+    <div>${right.map(t => `<button data-side="R" data-id="${t.id}" style="width:100%;margin-bottom:10px">${esc(t.meaning)}</button>`).join("")}</div></div><div id="fb"></div>`;
+  $app.querySelectorAll(".match button").forEach(b => b.onclick = () => {
+    if (b.classList.contains("done")) return;
+    if (!sel || sel.dataset.side === b.dataset.side) { $app.querySelectorAll(".match .sel").forEach(x => x.classList.remove("sel")); sel = b; b.classList.add("sel"); if (S.settings.speak) speak(b.textContent); return; }
+    if (sel.dataset.id === b.dataset.id) {
+      [sel, b].forEach(x => { x.classList.remove("sel"); x.classList.add("done"); }); mark(b.dataset.id, true); done++; S.xp += 5; S.coins += 2; beep(true);
+      document.getElementById("mc").textContent = `${done} / ${set.length}`; save();
+      if (done === set.length) { const bonus = mistakes === 0 ? 15 : 8; S.coins += bonus; save(); confetti(); checkBadges();
+        document.getElementById("fb").innerHTML = `<div class="feedback good pop">All matched! ${mistakes === 0 ? "Perfect — no mistakes!" : ""} <span class="chip">+${bonus} 🪙</span></div><div class="row"><button class="primary" id="again">Play again 🔁</button><button class="ghost" data-go="home">🏠 Home</button></div>`;
+        document.getElementById("again").onclick = () => matchGame(id); }
+    } else { mistakes++; beep(false); [sel, b].forEach(x => { x.classList.add("shake"); setTimeout(() => x.classList.remove("shake", "sel"), 400); }); }
+    sel = null;
+  });
+}
+
+// ───────────────────── badges ─────────────────────
+const BADGES = [
+  ["first", "🌱", "First steps", "Answer your first question", () => S.answered >= 1],
+  ["ten", "🔟", "Ten right", "10 correct answers", () => S.right >= 10],
+  ["fifty", "🎯", "Sharp shooter", "50 correct answers", () => S.right >= 50],
+  ["hundred", "💯", "Century", "100 correct answers", () => S.right >= 100],
+  ["fivehundred", "🧠", "Brain power", "500 correct answers", () => S.right >= 500],
+  ["mission", "🚀", "Lift off", "Finish a mission", () => S.missions >= 1],
+  ["mission10", "🛰️", "Space explorer", "Finish 10 missions", () => S.missions >= 10],
+  ["streak3", "🔥", "On fire", "3-day mission streak", () => S.streak >= 3],
+  ["streak7", "🌟", "Super week", "7-day mission streak", () => S.streak >= 7],
+  ["level5", "⭐", "Rising star", "Reach level 5", () => level() >= 5],
+  ["level10", "🏆", "Champion", "Reach level 10", () => level() >= 10],
+  ["shop", "🛍️", "Stylish", "Buy something in the shop", () => S.owned.length > 2],
+  ["master", "🎓", "Unit master", "Get a unit to 80% mastery", () => UNITS.some(u => mastery(u) >= 80)],
+  ["allworlds", "🌍", "World traveller", "Get every unit to 50%", () => UNITS.length > 1 && UNITS.every(u => mastery(u) >= 50)],
+];
+function checkBadges() {
+  const got = BADGES.filter(b => !S.badges.includes(b[0]) && b[4]());
+  if (!got.length) return;
+  got.forEach(b => S.badges.push(b[0])); S.coins += 10 * got.length; save(); confetti();
+  const d = document.createElement("div"); d.className = "feedback good pop"; d.style.cssText = "position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:9;box-shadow:0 6px 20px #0003";
+  d.textContent = `New badge: ${got.map(b => b[1] + " " + b[2]).join(", ")}! +${10 * got.length} 🪙`; document.body.appendChild(d); setTimeout(() => d.remove(), 3500);
+}
+
+applySettings();
+go("home");
+
+</script>
+</body>
+</html>
