@@ -99,6 +99,24 @@ input[type=range]{width:200px;height:34px}
 .slider{gap:12px}
 .readout{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
 .readout .chip{font-variant-numeric:tabular-nums}
+/* Scenes: a toy drawing that stays inside its frame, is capped so its text is not huge on a laptop,
+   and takes theme colours for text and panels. .duo puts two scenes side by side, stacked on a phone.
+   Bench tabs sit on a rule; option pickers are smaller pills so they do not read as more tabs. */
+.toybox svg.scene{overflow:hidden;max-width:560px;margin:6px auto}
+.scene text:not([fill]){fill:var(--ink)}
+.scene text.lbl{fill:var(--soft)}
+.scene .bgc{fill:var(--card)}
+.scene .edge{stroke:var(--line)}
+.duo{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;align-items:flex-start}
+.toybox .duo>svg.scene{flex:1 1 260px;min-width:0;max-width:400px;margin:0}
+.ctrl.tabs{padding-bottom:12px;border-bottom:2px solid var(--line)}
+.ctrl.pick{gap:6px}
+.ctrl.pick button{min-height:44px;padding:6px 14px;border-width:2px;border-radius:999px;font-size:.95em}
+.ctrl.pick .lead{color:var(--soft);font-size:.9em;margin-right:4px;font-weight:600}
+.slider input[type=range]{flex:1 1 140px;min-width:0;max-width:320px}
+.jobline{font-size:1.05em;margin:8px 0 0}
+@media (max-width:520px){.ctrl.tabs{gap:6px}.ctrl.tabs button{min-height:44px;padding:6px 12px;font-size:.95em}}
+.swatch{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:6px;border:1px solid var(--line)}
 .discs{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin:10px 0}
 .disc{border:2px solid var(--line);border-radius:14px;padding:8px 12px;font-size:.85em;opacity:.5}
 .disc.got{opacity:1;border-color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,var(--card))}
@@ -832,6 +850,10 @@ window.ARCADE = {
 // cell you build by dragging parts in and out, a job centre where five specialised cells either
 // manage their job or do not, and a zoom-out from one cell to a whole organism. Nothing is marked
 // wrong: taking the membrane away so the cytoplasm leaks out is a discovery, not a fail.
+//
+// Layout rules (from the 23 Sep audit): every drawing is an svg.scene that stays inside its own
+// viewBox, no label smaller than 12 units, readouts live in HTML chips rather than in the picture,
+// and option pickers use .ctrl.pick so they never look like another row of tabs.
 ARCADE.toy({
   id: "g06-u01-cells", unit: "g06-u01", order: 1,
   name: "Cell Lab", icon: "🔬",
@@ -867,65 +889,81 @@ ARCADE.toy({
 
     function shell(inner) {
       run++;
-      root.innerHTML = `<div class="ctrl">${tabs.map(([k, n]) =>
+      root.innerHTML = `<div class="ctrl tabs">${tabs.map(([k, n]) =>
         `<button data-tab="${k}" class="${k === tab ? "on" : ""}">${n}</button>`).join("")}</div><div id="bench">${inner}</div>`;
       root.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { tab = b.dataset.tab; draw(); });
       return run;
     }
     function draw() { ({ scope: scopeBench, build: buildBench, jobs: jobBench, zoom: zoomBench })[tab](); }
-    const pickRow = (attr, list, on) => `<div class="ctrl">${list.map(([k, n]) => `<button data-${attr}="${k}" class="${k === on ? "on" : ""}">${n}</button>`).join("")}</div>`;
+    const pickRow = (attr, lead, list, on) => `<div class="ctrl pick"><span class="lead">${lead}</span>${list.map(([k, n]) => `<button data-${attr}="${k}" class="${k === on ? "on" : ""}">${n}</button>`).join("")}</div>`;
     const wirePick = (attr, fn) => root.querySelectorAll(`[data-${attr}]`).forEach(b => b.onclick = () => {
       root.querySelectorAll(`[data-${attr}]`).forEach(x => x.classList.toggle("on", x === b)); fn(b.dataset[attr]);
     });
 
     // ── the microscope ──────────────────────────────────────────────────────
-    // The lens only comes sharp at one height, and the stronger the lens the closer that height is
-    // to the slide — so the ×40 picture is the one where crashing is easiest. That is the lesson.
+    // The lens only comes sharp at one gap, and the stronger the lens the smaller that gap — so the
+    // ×40 picture is the one where crashing is easiest. The objective gets longer with power, as on a
+    // real microscope, so the side view shows why.
     function scopeBench() {
-      const SHARP = { 4: 62, 10: 40, 40: 14 };
+      const SHARP = { 4: 62, 10: 40, 40: 14 }, LEN = { 4: 12, 10: 18, 40: 26 };
       let slide = "onion", mag = 4, h = 90, stained = false, cracked = false;
-      const r = shell(`${pickRow("slide", [["onion", "🧅 Onion skin"], ["cheek", "👄 Cheek cells"]], "onion")}
-        <svg viewBox="0 0 400 250" role="img" aria-label="A microscope from the side, and what you see down the eyepiece">
-          <defs><filter id="blur"><feGaussianBlur id="bl" stdDeviation="6"/></filter>
-            <clipPath id="eye"><circle cx="290" cy="118" r="98"/></clipPath></defs>
-          <text x="70" y="18" text-anchor="middle" font-size="12" fill="#5b6675">from the side</text>
-          <rect x="16" y="186" width="110" height="10" fill="#8d97a3"/>
-          <rect x="36" y="178" width="70" height="7" fill="#dbeaf6" stroke="#7f8c99" id="slideS"/>
-          <path id="crackS" d="" stroke="#b4531f" stroke-width="2" fill="none"/>
-          <g id="tube"><rect x="56" y="-80" width="30" height="110" fill="#5b6675"/><rect x="62" y="30" width="18" height="16" fill="#34495e"/>
-            <text x="71" y="42" text-anchor="middle" font-size="9" fill="#fff" id="magS">×4</text></g>
-          <text x="70" y="226" text-anchor="middle" font-size="13" fill="#5b6675" id="gap"></text>
-          <circle cx="290" cy="118" r="100" fill="#222"/>
-          <g clip-path="url(#eye)"><rect x="190" y="18" width="200" height="200" fill="#f4f1e8" id="bg"/>
-            <g id="cells" filter="url(#blur)"></g><path id="crack" d="" stroke="#333" stroke-width="3" fill="none"/></g>
-          <text x="290" y="240" text-anchor="middle" font-size="12" fill="#5b6675">down the eyepiece</text>
-        </svg>
-        ${pickRow("mag", [["4", "×4 lens"], ["10", "×10 lens"], ["40", "×40 lens"]], "4")}
-        <div class="ctrl slider"><label for="fk">Focus knob (lens up ↔ down)</label><input type="range" id="fk" min="0" max="100" value="10"><span class="chip" id="fkv"></span></div>
-        <div class="ctrl"><button id="stain">💧 Add a drop of stain</button><button id="fresh">🔄 Fresh slide</button></div>
-        <p class="muted" id="msg">Turn the focus knob to bring the lens down towards the slide until the cells look sharp.</p>`);
+      shell(`${pickRow("slide", "Slide:", [["onion", "🧅 Onion skin"], ["cheek", "👄 Cheek cells"]], "onion")}
+        ${pickRow("mag", "Lens:", [["4", "×4"], ["10", "×10"], ["40", "×40"]], "4")}
+        <div class="duo">
+          <svg class="scene" viewBox="0 0 220 260" role="img" aria-label="The microscope from the side">
+            <text x="110" y="16" text-anchor="middle" font-size="13" class="lbl">from the side</text>
+            <path d="M40 244 H180 V232 Q180 226 172 226 H48 Q40 226 40 232 Z" fill="#5b6675"/>
+            <path d="M150 226 V150 Q150 70 128 56" fill="none" stroke="#5b6675" stroke-width="16" stroke-linecap="round"/>
+            <circle cx="150" cy="176" r="13" fill="#34495e"/><line id="knobI" x1="150" y1="176" x2="150" y2="165" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+            <rect x="40" y="170" width="120" height="8" rx="2" fill="#34495e"/>
+            <circle cx="95" cy="206" r="9" fill="#f2d24c" stroke="#8d97a3" stroke-width="2"/>
+            <rect x="62" y="163" width="66" height="7" fill="#dbeaf6" stroke="#7f8c99"/>
+            <path id="crackS" d="" stroke="#c0392b" stroke-width="2.5" fill="none"/>
+            <g id="tube"><rect x="101" y="20" width="18" height="14" rx="2" fill="#34495e"/>
+              <rect x="97" y="34" width="26" height="62" fill="#5b6675"/><rect x="92" y="96" width="36" height="8" rx="3" fill="#34495e"/>
+              <rect id="obj" x="102" y="104" width="16" height="12" fill="#8d97a3"/>
+              <path d="M123 60 L136 60" stroke="#5b6675" stroke-width="10"/></g>
+            <g id="tubeL"><text x="8" y="31" font-size="12" class="lbl">eyepiece</text><path d="M60 27 H99" stroke="#9aa6b3" stroke-width="1.5"/></g>
+            <g id="objG"><text x="8" y="114" font-size="12" class="lbl">objective</text><path id="objP" d="M64 110 H100" stroke="#9aa6b3" stroke-width="1.5"/></g>
+            <text x="8" y="198" font-size="12" class="lbl">slide</text><path d="M34 190 L66 168" stroke="#9aa6b3" stroke-width="1.5"/>
+            <text x="110" y="211" font-size="12" class="lbl">light</text>
+            <text x="178" y="200" font-size="12" class="lbl" text-anchor="middle">focus</text>
+            <text x="110" y="258" text-anchor="middle" font-size="13" font-weight="bold" fill="#b4531f" id="gap"></text>
+          </svg>
+          <svg class="scene" viewBox="0 0 260 260" role="img" aria-label="What you see down the eyepiece">
+            <defs><filter id="blur" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur id="bl" stdDeviation="6"/></filter>
+              <clipPath id="eye"><circle cx="130" cy="122" r="104"/></clipPath></defs>
+            <circle cx="130" cy="122" r="112" fill="#1f2a37" stroke="#8d97a3" stroke-width="2"/>
+            <g clip-path="url(#eye)"><rect x="20" y="10" width="220" height="230" fill="#f7f3e8"/>
+              <g id="cells" filter="url(#blur)"></g><path id="crack" d="" stroke="#333" stroke-width="3" fill="none"/></g>
+            <rect x="190" y="14" width="44" height="24" rx="12" fill="#1f2a37"/><text x="212" y="31" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff" id="magV">×4</text>
+            <text x="130" y="254" text-anchor="middle" font-size="13" class="lbl">down the eyepiece</text>
+          </svg>
+        </div>
+        <div class="ctrl slider"><label for="fk">Focus: lens up</label><input type="range" id="fk" min="0" max="100" value="10"><label for="fk">down</label></div>
+        <div class="ctrl"><span class="chip" id="fkv"></span><button id="stain">💧 Add a drop of stain</button><button id="fresh">🔄 Fresh slide</button></div>
+        <p class="muted" id="msg">Turn the focus to bring the lens down towards the slide until the cells look sharp.</p>`);
 
-      // Cells are drawn once per slide and lens; the blur is the only thing the knob changes.
       function cellsSVG() {
-        const s = mag === 4 ? 0.35 : mag === 10 ? 0.8 : 2.2, cx = 290, cy = 118, out = [];
-        const nuc = stained ? (slide === "onion" ? "#8a5a12" : "#1d3f8f") : "#d8d2c2";
-        const fill = stained ? (slide === "onion" ? "#f2d58a" : "#aac4ef") : "#efeadd";
-        const edge = stained ? (slide === "onion" ? "#a07420" : "#3c62b8") : "#c9c1ad";
+        const s = mag === 4 ? 0.32 : mag === 10 ? 0.75 : 2, cx = 130, cy = 122, out = [];
+        const nuc = stained ? (slide === "onion" ? "#7a4a0c" : "#1d3f8f") : "#cbbf9f";
+        const fill = stained ? (slide === "onion" ? "#f2d58a" : "#aac4ef") : "#efe8d4";
+        const edge = stained ? (slide === "onion" ? "#a07420" : "#3c62b8") : "#b9ab88";
         if (slide === "onion") {
           const w = 70 * s, hh = 28 * s;
-          for (let row = -8; row <= 8; row++) for (let col = -6; col <= 6; col++) {
+          for (let row = -9; row <= 9; row++) for (let col = -8; col <= 8; col++) {
             const x = cx + col * w + (row % 2 ? w / 2 : 0) - w / 2, y = cy + row * hh - hh / 2;
-            if (Math.abs(x - cx) > 130 || Math.abs(y - cy) > 130) continue;
-            out.push(`<rect x="${x}" y="${y}" width="${w}" height="${hh}" fill="${fill}" stroke="${edge}" stroke-width="${Math.max(1, 2.5 * s)}"/>`,
-              `<circle cx="${x + w * (0.3 + ((row * 7 + col * 3) & 3) * 0.12)}" cy="${y + hh / 2}" r="${5 * s}" fill="${nuc}"/>`);
+            if (Math.abs(x + w / 2 - cx) > 120 + w || Math.abs(y + hh / 2 - cy) > 120 + hh) continue;
+            out.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${hh.toFixed(1)}" fill="${fill}" stroke="${edge}" stroke-width="${Math.max(1, 2.5 * s).toFixed(1)}"/>`,
+              `<circle cx="${(x + w * (0.3 + ((row * 7 + col * 3) & 3) * 0.12)).toFixed(1)}" cy="${(y + hh / 2).toFixed(1)}" r="${(5 * s).toFixed(1)}" fill="${nuc}"/>`);
           }
         } else {
-          const pts = [[0, 0], [-60, -40], [55, -35], [-45, 50], [60, 45], [0, -80], [5, 80], [-95, 5], [95, 0]];
+          const pts = [[0, 0], [-60, -40], [55, -35], [-45, 50], [60, 45], [0, -80], [5, 80], [-95, 5], [95, 0], [-100, -80], [100, -80], [-100, 85], [100, 85]];
           pts.forEach(([dx, dy], i) => {
             const x = cx + dx * s, y = cy + dy * s, R = 24 * s;
             const d = Array.from({ length: 9 }, (_, k) => { const a = k / 9 * 6.283, rr = R * (0.8 + 0.25 * Math.sin(k * 2.3 + i)); return `${k ? "L" : "M"}${(x + rr * Math.cos(a)).toFixed(1)} ${(y + rr * Math.sin(a)).toFixed(1)}`; }).join(" ") + "Z";
-            out.push(`<path d="${d}" fill="${fill}" stroke="${edge}" stroke-width="${Math.max(1, 1.5 * s)}" stroke-linejoin="round"/>`,
-              `<circle cx="${x + 4 * s}" cy="${y - 3 * s}" r="${5 * s}" fill="${nuc}"/>`);
+            out.push(`<path d="${d}" fill="${fill}" stroke="${edge}" stroke-width="${Math.max(1, 1.5 * s).toFixed(1)}" stroke-linejoin="round"/>`,
+              `<circle cx="${(x + 4 * s).toFixed(1)}" cy="${(y - 3 * s).toFixed(1)}" r="${(5 * s).toFixed(1)}" fill="${nuc}"/>`);
           });
         }
         return out.join("");
@@ -933,14 +971,20 @@ ARCADE.toy({
       function render() {
         if (!el("cells")) return;
         el("cells").innerHTML = cellsSVG();
-        const off = Math.abs(h - SHARP[mag]), blur = cracked ? 8 : Math.min(9, off / 3);
+        const off = Math.abs(h - SHARP[mag]), blur = cracked ? 7 : Math.min(6, off / 3);
         el("bl").setAttribute("stdDeviation", blur.toFixed(2));
-        el("tube").setAttribute("transform", `translate(0 ${-h * 1.5 + 132})`);
-        el("magS").textContent = "×" + mag;
-        el("fkv").textContent = cracked ? "💥" : blur < 0.8 ? "sharp" : "blurry";
+        // The lens tip sits h × 0.4 above the slide; the tube moves to keep it there.
+        const len = LEN[mag], tr = 59 - len - h * 0.4;
+        el("obj").setAttribute("height", len);
+        el("tube").setAttribute("transform", `translate(0 ${tr.toFixed(1)})`);
+        el("tubeL").setAttribute("transform", `translate(0 ${tr.toFixed(1)})`);
+        el("objG").setAttribute("transform", `translate(0 ${(tr + len / 2).toFixed(1)})`);
+        el("knobI").setAttribute("transform", `rotate(${(100 - h) * 3} 150 176)`);
+        el("magV").textContent = "×" + mag;
+        el("fkv").textContent = cracked ? "💥 cracked" : blur < 0.8 ? "✔ sharp" : "blurry";
         el("gap").textContent = cracked ? "the slide is cracked!" : h < 22 ? "careful — very close!" : "";
-        el("crack").setAttribute("d", cracked ? "M200 40 L260 110 L240 150 L330 220 M260 110 L360 90" : "");
-        el("crackS").setAttribute("d", cracked ? "M60 178 L70 185 L78 178 L88 185" : "");
+        el("crack").setAttribute("d", cracked ? "M40 40 L100 110 L80 150 L170 220 M100 110 L220 90" : "");
+        el("crackS").setAttribute("d", cracked ? "M84 163 L92 170 L100 163 L108 170" : "");
         if (cracked) return;
         if (blur < 0.8) {
           api.found("focus");
@@ -959,15 +1003,14 @@ ARCADE.toy({
         }
         render();
       };
-      wirePick("mag", m => { mag = +m; say(mag === 40 ? "The ×40 lens is sharp much closer to the slide. Go gently." : `×${mag} lens. ${mag === 4 ? "The widest view — easiest for finding cells." : ""}`); render(); });
-      wirePick("slide", s => { slide = s; stained = cracked = false; el("stain").textContent = "💧 Add a drop of stain"; say(s === "onion" ? "A thin layer of onion skin." : "Cells scraped from inside your cheek."); render(); });
+      wirePick("mag", m => { mag = +m; say(mag === 40 ? "The ×40 lens is longer, so it is sharp much closer to the slide. Go gently." : mag === 4 ? "×4 — the widest view, the easiest for finding cells." : "×10 lens."); render(); });
+      wirePick("slide", s => { slide = s; stained = false; say(s === "onion" ? "A thin layer of onion skin." : "Cells scraped from inside your cheek."); render(); });
       el("stain").onclick = () => {
         stained = true; api.found("stain");
         say(slide === "onion" ? "Iodine solution stains the onion cells, so the nucleus shows up." : "Methylene blue stains the cheek cells blue — the nucleus goes dark blue.");
         render();
       };
       el("fresh").onclick = () => { cracked = false; h = 90; el("fk").value = 10; stained = false; say("A fresh slide. Start with the lens high up."); render(); };
-      el("fk").value = 10; h = 90;
       render();
     }
 
@@ -978,23 +1021,23 @@ ARCADE.toy({
       const PARTS = [
         ["wall", "Cell wall", "#2e8b57", "Strong outer layer. Supports the cell and gives it a fixed shape. Plant cells only."],
         ["membrane", "Cell membrane", "#7b5ea7", "Thin layer round the cell. Controls what goes in and out."],
-        ["cytoplasm", "Cytoplasm", "#e6c35c", "Jelly that fills the cell. Chemical reactions happen here."],
+        ["cytoplasm", "Cytoplasm", "#d9a81e", "Jelly that fills the cell. Chemical reactions happen here."],
         ["nucleus", "Nucleus", "#8a4fa3", "Controls what the cell does."],
         ["mito", "Mitochondria", "#e07b39", "Release energy from food (respiration)."],
-        ["vacuole", "Sap vacuole", "#a8c8e8", "Big space full of cell sap. Keeps the cell firm. Plant cells only."],
+        ["vacuole", "Sap vacuole", "#6f9fcc", "Big space full of cell sap. Keeps the cell firm. Plant cells only."],
         ["chloro", "Chloroplasts", "#3aa655", "Absorb light to make food (photosynthesis). Only in plant cells that get light."],
       ];
       const has = {}, seen = {};
       let phase = 0;
-      const r = shell(`<svg viewBox="0 0 400 250" id="bsvg" role="img" aria-label="A cell you build from parts" style="touch-action:none">
-          <rect x="60" y="20" width="280" height="200" rx="18" fill="none" stroke="#c9d2db" stroke-width="2" stroke-dasharray="8 6"/>
-          <text x="200" y="14" text-anchor="middle" font-size="12" fill="#5b6675">drop parts in here · drag a part out to remove it</text>
+      const r = shell(`<svg class="scene" viewBox="0 0 360 250" id="bsvg" role="img" aria-label="A cell you build from parts" style="touch-action:none">
+          <rect x="14" y="8" width="332" height="212" rx="18" fill="none" class="edge" stroke-width="2.5" stroke-dasharray="8 6"/>
+          <text x="180" y="120" text-anchor="middle" font-size="15" class="lbl" id="empty">drag parts in here</text>
           <g id="cell"></g><g id="leak"></g>
-          <text x="200" y="242" text-anchor="middle" font-size="15" font-weight="bold" fill="#2f6f9f" id="what"></text>
+          <text x="180" y="243" text-anchor="middle" font-size="15" font-weight="bold" fill="#2f6f9f" id="what"></text>
         </svg>
-        <div class="ctrl" id="tray">${PARTS.map(([k, n, c]) => `<button data-part="${k}" style="touch-action:none"><span style="color:${c}">●</span> ${n}</button>`).join("")}</div>
-        <div class="ctrl"><button id="clear">🗑️ Empty</button></div>
-        <p class="muted" id="msg">Drag a part into the box, or tap it. Try building the smallest cell that can stay alive.</p>`);
+        <div class="ctrl" id="tray">${PARTS.map(([k, n, c]) => `<button data-part="${k}" style="touch-action:none"><span style="color:${c};font-size:1.2em">●</span> ${n}</button>`).join("")}</div>
+        <div class="ctrl"><button id="clear">🗑️ Empty the box</button></div>
+        <p class="muted" id="msg">Drag a part into the box, or tap it. Drag it back out to take it away. Try building the smallest cell that can stay alive.</p>`);
       const svg = el("bsvg");
 
       function toggle(k, on) {
@@ -1010,7 +1053,7 @@ ARCADE.toy({
       function react(before, k, on) {
         const working = b => b.membrane && b.cytoplasm && b.mito;
         if (!on && k === "mito" && working(before)) { api.found("power"); say("Power cut! With no mitochondria, no energy is released from food, so everything in the cell slows to a stop."); }
-        if (!on && k === "nucleus" && before.membrane && before.cytoplasm) { say("No nucleus — nothing is in control. A red blood cell grows up like this on purpose: more room for haemoglobin."); }
+        if (!on && k === "nucleus" && before.membrane && before.cytoplasm) say("No nucleus — nothing is in control. A red blood cell grows up like this on purpose: more room for haemoglobin.");
         if (on && k === "wall" && has.membrane && !before.wall) { api.found("shape"); say("The floppy cell now has a fixed shape. The cell wall supports it."); }
         const key = Object.keys(has).sort().join(",");
         if (key === "cytoplasm,membrane,mito,nucleus") { api.found("animal"); say("That is an animal cell: membrane, cytoplasm, nucleus and mitochondria. Every cell needs these four."); }
@@ -1019,28 +1062,28 @@ ARCADE.toy({
       }
       function render() {
         if (!el("cell")) return;
-        const wob = has.wall ? 0 : 1, t = phase, out = [];
-        const blob = (R, amp) => Array.from({ length: 24 }, (_, k) => {
-          const a = k / 24 * 6.283, rr = 1 + amp * wob * Math.sin(a * 3 + t) * 0.06;
-          const x = 200 + Math.cos(a) * R[0] * rr, y = 118 + Math.sin(a) * R[1] * rr;
-          return `${k ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`;
+        const wob = has.wall ? 0 : 1, t = phase, out = [], CX = 180, CY = 114;
+        const blob = (rx, ry) => Array.from({ length: 28 }, (_, k) => {
+          const a = k / 28 * 6.283, rr = 1 + wob * Math.sin(a * 3 + t) * 0.05;
+          return `${k ? "L" : "M"}${(CX + Math.cos(a) * rx * rr).toFixed(1)} ${(CY + Math.sin(a) * ry * rr).toFixed(1)}`;
         }).join(" ") + "Z";
-        const rectP = (w, hh) => `M${200 - w} ${118 - hh} H${200 + w} V${118 + hh} H${200 - w} Z`;
-        const outline = has.wall ? rectP(116, 76) : blob([110, 76], 1);
+        const rectP = (w, hh) => `M${CX - w} ${CY - hh} H${CX + w} V${CY + hh} H${CX - w} Z`;
+        const outline = has.wall ? rectP(128, 82) : blob(126, 82);
         if (has.cytoplasm && has.membrane) out.push(`<path d="${outline}" fill="#f6e7ad" data-in="cytoplasm"/>`);
-        if (has.wall) out.push(`<path d="${rectP(124, 84)}" fill="none" stroke="#2e8b57" stroke-width="9" data-in="wall"/>`);
-        if (has.vacuole) out.push(`<rect x="${has.nucleus ? 150 : 140}" y="70" width="120" height="96" rx="20" fill="#cfe2f5" stroke="#6f9fcc" stroke-width="2" data-in="vacuole"/>`);
-        if (has.nucleus) out.push(`<circle cx="118" cy="${has.vacuole ? 112 : 118}" r="20" fill="#8a4fa3" data-in="nucleus"/><circle cx="114" cy="114" r="6" fill="#5b2e70" pointer-events="none"/>`);
+        if (has.wall) out.push(`<path d="${rectP(136, 90)}" fill="none" stroke="#2e8b57" stroke-width="9" data-in="wall"/>`);
+        if (has.vacuole) out.push(`<rect x="166" y="62" width="120" height="104" rx="22" fill="#cfe2f5" stroke="#6f9fcc" stroke-width="2" data-in="vacuole"/>`);
+        if (has.nucleus) out.push(`<circle cx="110" cy="110" r="22" fill="#8a4fa3" data-in="nucleus"/><circle cx="104" cy="104" r="7" fill="#5b2e70" pointer-events="none"/>`);
         const powered = has.mito && has.membrane && has.cytoplasm;
-        if (has.mito) [[108, 168], [292, 68], [290, 170], [140, 60]].forEach(([x, y], i) => out.push(`<ellipse cx="${x}" cy="${y + (powered ? Math.sin(t * 2 + i) * 2 : 0)}" rx="14" ry="7" fill="#e07b39" data-in="mito"/>`));
-        if (has.chloro) [[98, 60], [300, 118], [98, 176], [230, 186], [230, 50], [160, 186]].forEach(([x, y]) => out.push(`<ellipse cx="${x}" cy="${y}" rx="11" ry="7" fill="#3aa655" stroke="#1f6b35" data-in="chloro"/>`));
+        if (has.mito) [[92, 162], [142, 58], [300, 60], [150, 170]].forEach(([x, y], i) => out.push(`<ellipse cx="${x}" cy="${(y + (powered ? Math.sin(t * 2 + i) * 2 : 0)).toFixed(1)}" rx="14" ry="7" fill="#e07b39" data-in="mito"/>`));
+        if (has.chloro) [[78, 56], [300, 114], [80, 170], [230, 182], [226, 46], [300, 172]].forEach(([x, y]) => out.push(`<ellipse cx="${x}" cy="${y}" rx="12" ry="7" fill="#3aa655" stroke="#1f6b35" data-in="chloro"/>`));
         if (has.membrane) out.push(`<path d="${outline}" fill="none" stroke="#7b5ea7" stroke-width="4" data-in="membrane"/>`);
-        if (has.cytoplasm && !has.membrane) out.push(`<path d="${blob([110, 76], 1)}" fill="#f6e7ad" opacity=".35" data-in="cytoplasm"/>`);
-        el("cell").innerHTML = out.join("");
         const leak = has.cytoplasm && !has.membrane;
-        el("leak").innerHTML = leak ? [0, 1, 2, 3].map(i => `<circle cx="${130 + i * 45}" cy="${200 + ((t * 20 + i * 13) % 40)}" r="6" fill="#e6c35c"/>`).join("") : "";
+        if (leak) out.push(`<path d="${blob(126, 82)}" fill="#f6e7ad" opacity=".35" data-in="cytoplasm"/>`);
+        el("cell").innerHTML = out.join("");
+        el("leak").innerHTML = leak ? [0, 1, 2, 3].map(i => `<circle cx="${90 + i * 60}" cy="${(190 + ((t * 20 + i * 13) % 26)).toFixed(1)}" r="6" fill="#e6c35c"/>`).join("") : "";
         const n = Object.keys(has).length;
-        el("what").textContent = !n ? "" : leak ? "the cytoplasm is leaking out!" : Object.keys(has).length === 7 ? "a plant cell" :
+        el("empty").style.display = n ? "none" : "";
+        el("what").textContent = !n ? "" : leak ? "the cytoplasm is leaking out!" : n === 7 ? "a plant cell" :
           (has.wall || has.vacuole || has.chloro) ? "looks like a plant cell" : has.membrane && has.cytoplasm && has.nucleus && has.mito ? "an animal cell" : "not alive yet…";
         root.querySelectorAll("[data-part]").forEach(b => b.classList.toggle("on", !!has[b.dataset.part]));
       }
@@ -1050,7 +1093,7 @@ ARCADE.toy({
         if (has.cytoplasm && !has.membrane && phase > 0.5) api.found("spill");
         render(); requestAnimationFrame(loop);
       })();
-      function inBox(e) { const b = svg.getBoundingClientRect(), x = (e.clientX - b.left) / b.width * 400, y = (e.clientY - b.top) / b.height * 250; return x > 60 && x < 340 && y > 20 && y < 220; }
+      function inBox(e) { const b = svg.getBoundingClientRect(), x = (e.clientX - b.left) / b.width * 360, y = (e.clientY - b.top) / b.height * 250; return x > 14 && x < 346 && y > 8 && y < 220; }
       // One drag routine for both directions: from the tray in, or from the cell out.
       function drag(e, k, fromCell) {
         const p = PARTS.find(x => x[0] === k), x0 = e.clientX, y0 = e.clientY;
@@ -1088,22 +1131,29 @@ ARCADE.toy({
     function jobBench() {
       const JOBS = [["rbc", "🩸 Red blood cell"], ["neuro", "⚡ Neurone"], ["cilia", "🧹 Ciliated cell"], ["root", "🌱 Root hair cell"], ["pal", "☀️ Palisade cell"]];
       let job = "rbc";
-      const r = shell(`${pickRow("job", JOBS, job)}<div id="job"></div><p class="muted" id="msg"></p>`);
+      const r = shell(`${pickRow("job", "Cell:", JOBS, job)}<div id="job"></div><p class="muted" id="msg"></p>`);
       wirePick("job", j => { job = j; open(); });
       let jr = 0;
       function open() {
         jr++; const me = jr, live = () => alive(r) && me === jr && el("job");
         ({ rbc, neuro, cilia, root: rootHair, pal })[job](live);
       }
+      const frame = (jobText, svg, controls) => `<p class="jobline"><b>Job:</b> ${jobText}</p>${svg}${controls}`;
+
       function rbc(live) {
         let nucleus = true, size = 30, x = 20, stuck = false;
-        el("job").innerHTML = `<svg viewBox="0 0 400 180" role="img" aria-label="A red blood cell squeezing through a capillary">
-            <text x="10" y="18" font-size="13" fill="#5b6675">Job: carry oxygen around the body</text>
-            <path d="M0 50 H160 Q180 50 190 75 H290 Q300 50 320 50 H400 M0 150 H160 Q180 150 190 125 H290 Q300 150 320 150 H400" fill="none" stroke="#c0392b" stroke-width="4"/>
-            <text x="240" y="100" text-anchor="middle" font-size="11" fill="#b4531f">capillary</text>
-            <g id="rc"></g><text x="10" y="176" font-size="13" fill="#5b6675" id="o2"></text></svg>
+        el("job").innerHTML = frame("carry oxygen around the body",
+          `<svg class="scene" viewBox="0 0 360 170" role="img" aria-label="A red blood cell moving through a blood vessel into a narrow capillary">
+            <path d="M0 40 H140 Q162 40 172 66 H268 Q278 40 300 40 H360 V130 H300 Q278 130 268 104 H172 Q162 130 140 130 H0 Z" fill="#fbe3e0"/>
+            <path d="M0 40 H140 Q162 40 172 66 H268 Q278 40 300 40 H360 M0 130 H140 Q162 130 172 104 H268 Q278 130 300 130 H360" fill="none" stroke="#c0392b" stroke-width="4"/>
+            <text x="220" y="58" text-anchor="middle" font-size="13" fill="#b4531f">capillary</text>
+            <text x="60" y="30" text-anchor="middle" font-size="13" class="lbl">blood vessel</text>
+            <g id="rc"></g>
+            <circle cx="24" cy="156" r="5" fill="#2f6f9f"/><text x="34" y="161" font-size="13" class="lbl">= oxygen</text>
+          </svg>`,
+          `<div class="readout"><span class="chip" id="o2"></span><span class="chip" id="fit"></span></div>
           <div class="ctrl"><button id="nuc">Take the nucleus out</button></div>
-          <div class="ctrl slider"><label for="sz">Cell size</label><input type="range" id="sz" min="18" max="60" value="30"></div>`;
+          <div class="ctrl slider"><label for="sz">Cell size</label><input type="range" id="sz" min="18" max="60" value="30"></div>`);
         say("A red blood cell carries oxygen using haemoglobin. Try changing it.");
         el("nuc").onclick = () => {
           nucleus = !nucleus; el("nuc").textContent = nucleus ? "Take the nucleus out" : "Put the nucleus back";
@@ -1112,45 +1162,51 @@ ARCADE.toy({
         el("sz").oninput = () => { size = +el("sz").value; stuck = false; };
         (function loop() {
           if (!live()) return;
-          const gapHalf = 25;
-          if (!stuck) x += 1.6;
-          if (x > 150 && x < 200 && size / 2 > gapHalf + 2) {
+          const gapHalf = 19, s = size / 2;
+          if (!stuck) x += 1.4;
+          if (x + s > 166 && x < 200 && s * 0.7 > gapHalf) {
             if (!stuck) { stuck = true; api.found("stuck"); say("Stuck! Too big to fit through the capillary. Real red blood cells are very small and can bend."); }
-            x = 150;
+            x = 166 - s;
           }
-          if (x > 420) x = -30;
-          const cap = nucleus ? 5 : 9, s = size / 2, squash = x > 170 && x < 300 ? Math.min(1, gapHalf / s) : 1;
-          el("rc").innerHTML = `<ellipse cx="${x}" cy="100" rx="${s}" ry="${s * squash}" fill="#d9534f" stroke="#922" stroke-width="2"/>`
-            + (nucleus ? `<circle cx="${x - s * 0.3}" cy="100" r="${s * 0.35}" fill="#7a2230"/>` : "")
-            + Array.from({ length: cap }, (_, i) => `<circle cx="${x + Math.cos(i * 2.4) * s * 0.55 + (nucleus ? s * 0.25 : 0)}" cy="${100 + Math.sin(i * 2.4) * s * 0.55 * squash}" r="3" fill="#2f6f9f"/>`).join("");
-          el("o2").textContent = `oxygen carried in this cell: ${cap}${stuck ? " — but it is stuck" : ""}`;
+          if (x > 400) x = -30;
+          const cap = nucleus ? 5 : 9, inCap = x > 160 && x < 280, squash = inCap ? Math.min(1, gapHalf / (s * 0.7)) : 1;
+          const rx = s * (inCap ? 1 / Math.max(squash, 0.6) : 1), ry = s * 0.7 * squash, wob = stuck ? Math.sin(performance.now() / 40) * 2 : 0;
+          el("rc").innerHTML = `<g transform="translate(${(x + wob).toFixed(1)} 85)"><ellipse rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" fill="#d9534f" stroke="#922" stroke-width="2"/>`
+            + (nucleus ? `<circle cx="${(-rx * 0.35).toFixed(1)}" r="${(s * 0.3).toFixed(1)}" fill="#6b2140"/>` : `<ellipse rx="${(rx * 0.4).toFixed(1)}" ry="${(ry * 0.35).toFixed(1)}" fill="#e98a84"/>`)
+            + Array.from({ length: cap }, (_, i) => { const a = i * 2.4, k = nucleus ? 0.5 : 0.62; return `<circle cx="${(Math.cos(a) * rx * k + (nucleus ? rx * 0.25 : 0)).toFixed(1)}" cy="${(Math.sin(a) * ry * k).toFixed(1)}" r="3.2" fill="#2f6f9f"/>`; }).join("") + "</g>";
+          el("o2").textContent = `oxygen carried: ${cap}`;
+          el("fit").textContent = stuck ? "🚫 too big — stuck" : s * 0.7 > gapHalf ? "too big for the capillary" : "fits through the capillary";
           requestAnimationFrame(loop);
         })();
       }
       function neuro(live) {
         let sheath = false, going = false, pos = 0, t0 = 0, times = {};
-        el("job").innerHTML = `<svg viewBox="0 0 400 150" role="img" aria-label="A neurone sending a signal">
-            <text x="10" y="18" font-size="13" fill="#5b6675">Job: carry signals around the body</text>
-            <circle cx="40" cy="80" r="22" fill="#e8c5e0" stroke="#8a4fa3" stroke-width="3"/><circle cx="40" cy="80" r="7" fill="#8a4fa3"/>
-            <path d="M24 64 L8 44 M22 96 L6 116 M40 58 L40 32" stroke="#8a4fa3" stroke-width="3"/>
-            <line x1="62" y1="80" x2="350" y2="80" stroke="#8a4fa3" stroke-width="5"/>
-            <g id="sh"></g><path d="M350 80 L385 60 M350 80 L388 80 M350 80 L385 100" stroke="#8a4fa3" stroke-width="3"/>
-            <circle id="sig" cx="62" cy="80" r="7" fill="#f2b705" opacity="0"/>
-            <text x="200" y="130" text-anchor="middle" font-size="13" fill="#5b6675" id="tm">long, thin axon →</text></svg>
-          <div class="ctrl"><button id="send">⚡ Send a signal</button><button id="wrap">Wrap the axon in a fatty sheath</button></div>`;
+        el("job").innerHTML = frame("carry signals from one part of the body to another",
+          `<svg class="scene" viewBox="0 0 360 140" role="img" aria-label="A neurone sending a signal along its axon">
+            <path d="M28 58 L14 40 M26 90 L12 106 M40 52 L42 32 M52 92 L60 110" stroke="#8a4fa3" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="40" cy="72" r="22" fill="#ecd3e6" stroke="#8a4fa3" stroke-width="3"/><circle cx="40" cy="72" r="7" fill="#8a4fa3"/>
+            <line x1="62" y1="72" x2="304" y2="72" stroke="#8a4fa3" stroke-width="5"/>
+            <g id="sh"></g><path d="M304 72 L340 50 M304 72 L344 72 M304 72 L340 94" stroke="#8a4fa3" stroke-width="3" stroke-linecap="round"/>
+            <circle id="sig" cx="62" cy="72" r="8" fill="#f2b705" stroke="#b4531f" opacity="0"/>
+            <text x="40" y="130" text-anchor="middle" font-size="13" class="lbl">cell body</text>
+            <text x="183" y="112" text-anchor="middle" font-size="13" class="lbl">long, thin axon</text>
+            <text x="322" y="118" text-anchor="middle" font-size="13" class="lbl">branched ends</text>
+          </svg>`,
+          `<div class="readout"><span class="chip" id="tm">signal not sent yet</span></div>
+          <div class="ctrl"><button id="send">⚡ Send a signal</button><button id="wrap">Wrap the axon in a fatty sheath</button></div>`);
         say("A neurone has a long thin axon to carry a signal a long way. Send one.");
-        const drawSheath = () => el("sh").innerHTML = sheath ? Array.from({ length: 6 }, (_, i) => `<rect x="${72 + i * 46}" y="71" width="38" height="18" rx="9" fill="#f5e6a8" stroke="#c9a227"/>`).join("") : "";
+        const drawSheath = () => el("sh").innerHTML = sheath ? Array.from({ length: 5 }, (_, i) => `<rect x="${70 + i * 47}" y="62" width="40" height="20" rx="10" fill="#f5e6a8" stroke="#c9a227" stroke-width="1.5"/>`).join("") : "";
         el("wrap").onclick = () => { sheath = !sheath; el("wrap").textContent = sheath ? "Take the fatty sheath off" : "Wrap the axon in a fatty sheath"; drawSheath(); };
-        el("send").onclick = () => { if (going) return; going = true; pos = 0; t0 = performance.now(); };
+        el("send").onclick = () => { if (going) return; going = true; pos = 0; t0 = performance.now(); el("tm").textContent = "signal on its way…"; };
         (function loop(now) {
           if (!live()) return;
           if (going) {
-            pos += sheath ? 7 : 2.2;
-            const x = sheath ? 62 + Math.min(288, Math.floor(pos / 46) * 46 + 46) : 62 + Math.min(288, pos);
-            el("sig").setAttribute("cx", Math.min(350, x)); el("sig").setAttribute("opacity", 1);
-            if (pos >= 288) {
+            pos += sheath ? 6 : 2;
+            const x = sheath ? 62 + Math.min(242, Math.floor(pos / 47) * 47 + 23) : 62 + Math.min(242, pos);
+            el("sig").setAttribute("cx", Math.min(304, x)); el("sig").setAttribute("opacity", 1);
+            if (pos >= 242) {
               going = false; const s = ((now - t0) / 1000).toFixed(1); times[sheath ? "fast" : "slow"] = s;
-              el("tm").textContent = `the signal took ${s} s${sheath ? " — with a fatty sheath" : ""}`;
+              el("tm").textContent = `the signal took ${s} s ${sheath ? "with" : "without"} a fatty sheath`;
               if (sheath) { api.found("sheath"); say(`With the fatty sheath the signal jumps along — ${s} seconds${times.slow ? `, not ${times.slow}` : ""}.`); }
               else say(`${s} seconds without a sheath. Now wrap it and try again.`);
             }
@@ -1159,70 +1215,105 @@ ARCADE.toy({
         })(performance.now());
       }
       function cilia(live) {
-        let mito = 1, y = 150, beat = 0, done = false;
-        el("job").innerHTML = `<svg viewBox="0 0 400 190" role="img" aria-label="Ciliated cells sweeping mucus up an airway">
-            <text x="10" y="18" font-size="13" fill="#5b6675">Job: sweep mucus up and out of the airway</text>
-            <text x="300" y="36" font-size="12" fill="#5b6675">↑ to the throat</text>
-            <rect x="60" y="30" width="40" height="160" fill="#f4d4d4" stroke="#c98"/><g id="hairs"></g>
-            <g id="muc"></g></svg>
-          <div class="ctrl slider"><label for="mi">Mitochondria in each cell</label><input type="range" id="mi" min="0" max="10" value="1"><span class="chip" id="miv">1</span></div>`;
+        let mito = 1, y = 190, beat = 0, done = false;
+        el("job").innerHTML = frame("sweep mucus up and out of the airway",
+          `<svg class="scene" viewBox="0 0 360 246" role="img" aria-label="Ciliated cells lining an airway, sweeping mucus upwards">
+            <text x="150" y="18" text-anchor="middle" font-size="13" font-weight="bold" fill="#2f6f9f">⬆ to the throat</text>
+            <g id="cells"></g><rect x="110" y="26" width="46" height="196" fill="#dfeecf" opacity=".6"/>
+            <g id="hairs"></g><g id="muc"></g>
+            <text x="56" y="240" text-anchor="middle" font-size="13" class="lbl">ciliated cells</text>
+            <text x="133" y="240" text-anchor="middle" font-size="13" class="lbl">mucus</text>
+            <text x="260" y="120" text-anchor="middle" font-size="13" class="lbl">air in the windpipe</text>
+          </svg>`,
+          `<div class="ctrl slider"><label for="mi">Mitochondria in each cell</label><input type="range" id="mi" min="0" max="8" value="1"><span class="chip" id="miv">1</span></div>`);
         say("Mucus traps dust. The cilia beat to sweep it up. They need energy from the mitochondria.");
-        el("mi").oninput = () => { mito = +el("mi").value; el("miv").textContent = mito; };
+        const cellsSVG = () => Array.from({ length: 5 }, (_, i) => {
+          const y0 = 26 + i * 39;
+          return `<rect x="16" y="${y0}" width="80" height="37" rx="6" fill="#f4d4d4" stroke="#c98a8a"/><circle cx="38" cy="${y0 + 18}" r="7" fill="#9b4f6b"/>`
+            + Array.from({ length: mito }, (_, k) => `<ellipse cx="${56 + (k % 4) * 9}" cy="${y0 + 11 + Math.floor(k / 4) * 14}" rx="4" ry="2.5" fill="#e07b39"/>`).join("");
+        }).join("");
+        el("cells").innerHTML = cellsSVG();
+        el("mi").oninput = () => { mito = +el("mi").value; el("miv").textContent = mito; el("cells").innerHTML = cellsSVG(); };
         (function loop() {
           if (!live()) return;
-          beat += mito * 0.06;
-          y = Math.max(34, Math.min(170, y - (mito - 2) * 0.2));
-          if (y <= 34 && !done) { done = true; api.found("sweep"); say("Swept all the way up to the throat, where it is swallowed. Lots of mitochondria = lots of energy for the cilia."); }
+          beat += mito * 0.07;
+          y = Math.max(46, Math.min(196, y - (mito - 2) * 0.22));
+          if (y <= 46 && !done) { done = true; api.found("sweep"); say("Swept all the way up to the throat, where it is swallowed. Lots of mitochondria = lots of energy for the cilia."); }
           if (mito === 0) say("No energy, no beating. The mucus slides back down.");
-          el("hairs").innerHTML = Array.from({ length: 14 }, (_, i) => { const yy = 40 + i * 11, a = Math.sin(beat + i * 0.5) * 10; return `<path d="M100 ${yy} q12 ${-4 + a * 0.2} 22 ${-8 + a * 0.4}" stroke="#b86" stroke-width="2" fill="none"/>`; }).join("");
-          el("muc").innerHTML = `<ellipse cx="135" cy="${y}" rx="16" ry="24" fill="#b8d98b" opacity=".85"/><circle cx="130" cy="${y - 6}" r="3" fill="#555"/><circle cx="140" cy="${y + 8}" r="3" fill="#555"/>`;
+          el("hairs").innerHTML = Array.from({ length: 20 }, (_, i) => { const yy = 30 + i * 9.6, a = Math.sin(beat + i * 0.5) * 7; return `<path d="M96 ${yy.toFixed(1)} q8 ${(-3 + a * 0.3).toFixed(1)} 16 ${(-6 + a).toFixed(1)}" stroke="#a0685a" stroke-width="2" fill="none" stroke-linecap="round"/>`; }).join("");
+          el("muc").innerHTML = `<ellipse cx="133" cy="${y.toFixed(1)}" rx="18" ry="22" fill="#9dc56b" opacity=".9"/><circle cx="127" cy="${(y - 7).toFixed(1)}" r="3" fill="#555"/><circle cx="139" cy="${(y + 6).toFixed(1)}" r="3" fill="#555"/><circle cx="131" cy="${(y + 12).toFixed(1)}" r="2" fill="#555"/>`;
           requestAnimationFrame(loop);
         })();
       }
       function rootHair(live) {
         let len = 10, water = 0, done = false;
-        el("job").innerHTML = `<svg viewBox="0 0 400 190" role="img" aria-label="A root hair cell reaching between soil particles">
-            <text x="10" y="18" font-size="13" fill="#5b6675">Job: take in water and minerals from the soil</text>
-            <g id="soil"></g><rect x="20" y="80" width="70" height="44" fill="#eef7e4" stroke="#2e8b57" stroke-width="3"/>
-            <rect x="30" y="90" width="50" height="24" rx="6" fill="#cfe2f5"/><path id="hr" d="" fill="#eef7e4" stroke="#2e8b57" stroke-width="3"/>
-            <rect x="350" y="40" width="34" height="120" fill="none" stroke="#7f8c99" stroke-width="3"/><rect id="gl" x="352" y="158" width="30" height="0" fill="#4a90d9"/>
-            <text x="367" y="178" text-anchor="middle" font-size="11" fill="#5b6675">water in</text></svg>
-          <div class="ctrl slider"><label for="hl">Root hair length</label><input type="range" id="hl" min="0" max="240" value="10"></div>`;
+        el("job").innerHTML = frame("take in water and minerals from the soil",
+          `<svg class="scene" viewBox="0 0 360 214" role="img" aria-label="A root hair cell reaching between soil particles, and a glass showing how much water it has taken in">
+            <rect x="0" y="0" width="300" height="194" fill="#efe3cf"/>
+            <g id="soil"></g>
+            <rect x="8" y="78" width="74" height="46" rx="4" fill="#f3f9ec" stroke="#2e8b57" stroke-width="3"/>
+            <rect x="18" y="88" width="54" height="26" rx="8" fill="#cfe2f5"/><circle cx="30" cy="101" r="6" fill="#8a4fa3"/>
+            <path id="hr" d="" fill="#f3f9ec" stroke="#2e8b57" stroke-width="3"/><rect id="hv" x="72" y="97" width="0" height="8" fill="#cfe2f5"/>
+            <text x="45" y="70" text-anchor="middle" font-size="13" font-weight="bold" fill="#2e8b57">root hair cell</text>
+            <text x="150" y="210" text-anchor="middle" font-size="13" class="lbl">soil particles, with water between them</text>
+            <rect x="312" y="40" width="36" height="124" rx="3" fill="none" stroke="#7f8c99" stroke-width="3"/><rect id="gl" x="315" y="161" width="30" height="0" fill="#4a90d9"/>
+            <text x="330" y="186" text-anchor="middle" font-size="13" class="lbl">water</text><text x="330" y="202" text-anchor="middle" font-size="13" class="lbl">taken in</text>
+          </svg>`,
+          `<div class="ctrl slider"><label for="hl">Root hair length</label><input type="range" id="hl" min="0" max="200" value="10"></div>`);
         say("Water moves in through the cell wall, the membrane and the cytoplasm, into the sap vacuole. Grow the hair.");
-        const soil = []; for (let i = 0; i < 24; i++) soil.push([100 + (i * 53) % 240, 40 + (i * 37) % 130]);
-        el("soil").innerHTML = soil.map(([x, y]) => (Math.abs(y - 102) < 18 ? "" : `<circle cx="${x}" cy="${y}" r="14" fill="#c8a57a"/>`)).join("") + soil.map(([x, y], i) => i % 3 ? "" : `<circle cx="${x + 20}" cy="${y + 10}" r="4" fill="#4a90d9"/>`).join("");
+        // Particles in rows above and below the channel the hair grows along, water drops between.
+        const soil = [];
+        [[24, 0], [50, 18], [146, 0], [172, 18]].forEach(([y, off]) => { for (let x = 100 + off; x < 296; x += 38) soil.push([x, y]); });
+        el("soil").innerHTML = soil.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="15" fill="#c8a57a" stroke="#a88657"/>`).join("")
+          + soil.filter((_, i) => i % 2).filter(([x]) => x < 262).map(([x, y]) => `<circle cx="${x + 19}" cy="${y + (y < 100 ? 16 : -16)}" r="4" fill="#4a90d9"/>`).join("")
+          + [110, 150, 190, 230, 270].map(x => `<circle cx="${x}" cy="${x % 80 ? 90 : 112}" r="4" fill="#4a90d9"/>`).join("");
         el("hl").oninput = () => { len = +el("hl").value; water = 0; done = false; };
         (function loop() {
           if (!live()) return;
-          el("hr").setAttribute("d", `M90 96 H${90 + len} a6 6 0 0 1 0 12 H90`);
-          water = Math.min(116, water + (4 + len) * 0.0035);
-          el("gl").setAttribute("y", 158 - water); el("gl").setAttribute("height", water);
-          if (water >= 116 && !done) { done = true; if (len > 150) { api.found("hair"); say("Full! The long thin hair has a big surface area and reaches between the soil particles."); } else say("Full at last — slowly. Try a longer hair and watch how much faster it fills."); }
+          el("hr").setAttribute("d", `M82 94 H${82 + len} a7 7 0 0 1 0 14 H82`);
+          el("hv").setAttribute("width", Math.max(0, len + 4));
+          water = Math.min(120, water + (4 + len) * 0.004);
+          el("gl").setAttribute("y", (161 - water).toFixed(1)); el("gl").setAttribute("height", water.toFixed(1));
+          if (water >= 120 && !done) { done = true; if (len > 140) { api.found("hair"); say("Full! The long thin hair has a big surface area and reaches between the soil particles."); } else say("Full at last — slowly. Try a longer hair and watch how much faster it fills."); }
           requestAnimationFrame(loop);
         })();
       }
       function pal(live) {
         let n = 4, top = false, sugar = 0;
-        el("job").innerHTML = `<svg viewBox="0 0 400 190" role="img" aria-label="A palisade cell in a leaf, under the sun">
-            <text x="10" y="18" font-size="13" fill="#5b6675">Job: make food by photosynthesis</text>
-            <circle cx="360" cy="30" r="18" fill="#f2b705"/><rect x="20" y="50" width="260" height="120" fill="#e3f1d8" stroke="#2e8b57"/>
-            <text x="286" y="60" font-size="11" fill="#5b6675">top of leaf</text><text x="286" y="168" font-size="11" fill="#5b6675">bottom</text>
-            <g id="pc"></g><rect x="320" y="60" width="30" height="110" fill="none" stroke="#7f8c99" stroke-width="2"/><rect id="sg" x="322" y="168" width="26" height="0" fill="#d99a00"/>
-            <text x="335" y="184" text-anchor="middle" font-size="11" fill="#5b6675">sugar</text></svg>
-          <div class="ctrl slider"><label for="cn">Chloroplasts</label><input type="range" id="cn" min="0" max="20" value="4"><span class="chip" id="cnv">4</span></div>
-          <div class="ctrl"><button id="mv">Move it to the top of the leaf</button></div>`;
+        el("job").innerHTML = frame("make food by photosynthesis",
+          `<svg class="scene" viewBox="0 0 360 232" role="img" aria-label="A slice through a leaf with light coming from above">
+            <defs><linearGradient id="lightfall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3b0" stop-opacity=".7"/><stop offset="1" stop-color="#fff3b0" stop-opacity="0"/></linearGradient></defs>
+            <circle cx="262" cy="16" r="13" fill="#f2b705"/>
+            <rect x="96" y="30" width="200" height="164" fill="#e8f3de" stroke="#2e8b57"/>
+            <g id="leaf"></g><rect x="96" y="30" width="200" height="164" fill="url(#lightfall)" pointer-events="none"/>
+            <text x="90" y="44" text-anchor="end" font-size="13" class="lbl">top of leaf</text>
+            <text x="90" y="86" text-anchor="end" font-size="13" class="lbl">palisade</text>
+            <text x="90" y="146" text-anchor="end" font-size="13" class="lbl">spongy</text>
+            <text x="90" y="192" text-anchor="end" font-size="13" class="lbl">bottom</text>
+            <rect x="318" y="44" width="30" height="140" rx="3" fill="none" stroke="#7f8c99" stroke-width="3"/><rect id="sg" x="321" y="181" width="24" height="0" fill="#d99a00"/>
+            <text x="333" y="204" text-anchor="middle" font-size="13" class="lbl">sugar</text>
+            <rect x="100" y="210" width="16" height="12" rx="3" fill="#fff" stroke="#2f6f9f" stroke-width="3"/><text x="124" y="221" font-size="13" class="lbl">= your cell</text>
+          </svg>`,
+          `<div class="ctrl slider"><label for="cn">Chloroplasts</label><input type="range" id="cn" min="0" max="20" value="4"><span class="chip" id="cnv">4</span></div>
+          <div class="ctrl"><button id="mv">⬆ Move it to the top of the leaf</button></div>`);
         say("Palisade cells are tall and thin. Give this one chloroplasts and put it where the light is.");
         el("cn").oninput = () => { n = +el("cn").value; el("cnv").textContent = n; sugar = 0; };
-        el("mv").onclick = () => { top = !top; sugar = 0; el("mv").textContent = top ? "Move it to the bottom of the leaf" : "Move it to the top of the leaf"; };
+        el("mv").onclick = () => { top = !top; sugar = 0; el("mv").textContent = top ? "⬇ Move it to the bottom of the leaf" : "⬆ Move it to the top of the leaf"; };
         (function loop() {
           if (!live()) return;
-          const light = top ? 1 : 0.3, y0 = top ? 54 : 106;
-          sugar = Math.min(106, sugar + n * light * 0.035);
-          el("pc").innerHTML = `<rect x="130" y="${y0}" width="36" height="62" rx="8" fill="#f7fbf2" stroke="#2e8b57" stroke-width="2"/>`
-            + Array.from({ length: n }, (_, i) => `<ellipse cx="${138 + (i % 3) * 10}" cy="${y0 + 6 + Math.floor(i / 3) * 8}" rx="4" ry="3" fill="#3aa655"/>`).join("")
-            + `<path d="M350 40 L${150} ${y0}" stroke="#f2b705" stroke-width="${1 + light * 3}" stroke-dasharray="6 5" opacity=".8"/>`;
-          el("sg").setAttribute("y", 168 - sugar); el("sg").setAttribute("height", sugar);
-          if (sugar >= 106 && n >= 15 && top) { api.found("palisade"); say("Lots of chloroplasts, at the top of the leaf where the light is strongest — a sugar factory."); }
+          const light = top ? 1 : 0.3;
+          // Upper epidermis, a row of tall palisade cells, rounded spongy cells with air spaces, lower epidermis.
+          let g = `<rect x="96" y="30" width="200" height="10" fill="#f7fbf2" stroke="#9cc38a"/><rect x="96" y="184" width="200" height="10" fill="#f7fbf2" stroke="#9cc38a"/>`;
+          for (let i = 0; i < 8; i++) if (!(top && i === 3)) g += `<rect x="${99 + i * 25}" y="42" width="21" height="66" rx="6" fill="#d5ebc4" stroke="#6aa55a"/>`;
+          for (let i = 0; i < 7; i++) for (let j = 0; j < 2; j++) if (!(!top && i === 3 && j === 1)) g += `<ellipse cx="${112 + i * 28 + j * 12}" cy="${130 + j * 30}" rx="11" ry="10" fill="#dcefcf" stroke="#6aa55a"/>`;
+          const cx = top ? 174 : 196, cy = top ? 42 : 144, w = top ? 21 : 26, hh = top ? 66 : 36;
+          g += `<rect x="${cx}" y="${cy}" width="${w}" height="${hh}" rx="6" fill="#fff" stroke="#2f6f9f" stroke-width="3"/>`
+            + Array.from({ length: n }, (_, i) => `<ellipse cx="${cx + 5 + (i % 3) * 5.5}" cy="${cy + 5 + Math.floor(i / 3) * (hh - 8) / 7}" rx="3" ry="2.2" fill="#2e8b57"/>`).join("")
+            + `<path d="M262 30 L${cx + w / 2} ${cy + 2}" stroke="#e0a800" stroke-width="${1 + light * 3}" stroke-dasharray="5 4"/>`;
+          el("leaf").innerHTML = g;
+          sugar = Math.min(137, sugar + n * light * 0.04);
+          el("sg").setAttribute("y", (181 - sugar).toFixed(1)); el("sg").setAttribute("height", sugar.toFixed(1));
+          if (sugar >= 137 && n >= 15 && top) { api.found("palisade"); say("Lots of chloroplasts, at the top of the leaf where the light is strongest — a sugar factory."); }
           requestAnimationFrame(loop);
         })();
       }
@@ -1230,28 +1321,90 @@ ARCADE.toy({
     }
 
     // ── zoom out ────────────────────────────────────────────────────────────
+    // Each level is drawn, with a blue box showing where the level before it is hiding. Moving the
+    // slider zooms the picture out from that box, so "a tissue is made of cells" is something seen.
     function zoomBench() {
-      const PATHS = {
-        human: [["Cell", "One ciliated cell", "🟣"], ["Tissue", "Ciliated epithelium — lots of similar cells working together", "🟣🟣🟣"],
-          ["Organ", "The windpipe and lungs — made of several different tissues", "🫁"], ["Organ system", "The respiratory system — organs working together to take in oxygen", "🫁👃"], ["Organism", "A whole person", "🧍"]],
-        tree: [["Cell", "One palisade cell", "🟩"], ["Tissue", "The palisade layer — lots of similar cells", "🟩🟩🟩"],
-          ["Organ", "A leaf — made of several different tissues", "🍃"], ["Organ system", "The shoot system — stem, leaves and flowers", "🌿🌼"], ["Organism", "A whole plant", "🌻"]],
+      const HUMAN = [
+        ["Cell", "One ciliated cell", [180, 120]],
+        ["Tissue", "Ciliated epithelium: lots of similar cells working together", [150, 113]],
+        ["Organ", "The windpipe and lungs: organs made of several different tissues", [180, 38]],
+        ["Organ system", "The respiratory system: organs working together to take in oxygen and get rid of carbon dioxide", [180, 152]],
+        ["Organism", "A whole person", [180, 83]],
+      ];
+      const PLANT = [
+        ["Cell", "One palisade cell", [180, 120]],
+        ["Tissue", "The palisade layer: lots of similar cells working together", [140, 110]],
+        ["Organ", "A leaf: an organ made of several different tissues", [200, 108]],
+        ["Organ system", "The shoot system: stem, leaves and flowers working together", [237, 100]],
+        ["Organism", "A whole plant", [180, 98]],
+      ];
+      const cilCell = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})"><rect x="-22" y="-40" width="44" height="80" rx="8" fill="#f4d4d4" stroke="#b9737a" stroke-width="2"/><circle cy="10" r="10" fill="#9b4f6b"/>`
+        + [-16, -8, 0, 8, 16].map(dx => `<path d="M${dx} -40 q3 -8 0 -14" stroke="#a0685a" stroke-width="2" fill="none"/>`).join("") + "</g>";
+      const palCell = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})"><rect x="-18" y="-50" width="36" height="100" rx="10" fill="#e3f2d6" stroke="#4f8f3f" stroke-width="2"/>`
+        + Array.from({ length: 10 }, (_, i) => `<ellipse cx="${-8 + (i % 2) * 16}" cy="${-40 + Math.floor(i / 2) * 20}" rx="5" ry="3.5" fill="#2e8b57"/>`).join("") + `<circle cy="4" r="7" fill="#7a5a9c"/></g>`;
+      const lungs = (x, y, s) => `<g transform="translate(${x} ${y}) scale(${s})"><path d="M0 -50 V-6" stroke="#c9a3a3" stroke-width="10" stroke-linecap="round"/><path d="M0 -8 L-18 8 M0 -8 L18 8" stroke="#c9a3a3" stroke-width="7" stroke-linecap="round"/>
+          <path d="M-8 0 C-40 -10 -52 40 -40 62 C-30 70 -12 64 -8 50 Z" fill="#e8737d"/><path d="M8 0 C40 -10 52 40 40 62 C30 70 12 64 8 50 Z" fill="#e8737d"/></g>`;
+      const petal = a => { const r = a * Math.PI / 180, x = (Math.cos(r) * 14).toFixed(1), y = (-58 + Math.sin(r) * 14).toFixed(1); return `<ellipse cx="${x}" cy="${y}" rx="7" ry="5" fill="#f5d34f" transform="rotate(${a} ${x} ${y})"/>`; };
+      const shoot = (x, y, s) => `<g transform="translate(${x} ${y}) scale(${s})"><path d="M0 60 V-50" stroke="#4f8f3f" stroke-width="5"/>
+          <path d="M0 30 Q-30 20 -40 0 Q-12 4 0 30 M0 0 Q30 -10 40 -30 Q12 -26 0 0 M0 -30 Q-24 -36 -30 -56 Q-8 -50 0 -30" fill="#6fbf5a" stroke="#3f7f31"/>
+          ${[0, 72, 144, 216, 288].map(petal).join("")}<circle cy="-58" r="8" fill="#b4531f"/></g>`;
+      const box = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#2f6f9f" stroke-width="3" stroke-dasharray="6 4" rx="4"/>`;
+      const DRAW = {
+        human: [
+          () => cilCell(180, 125, 1.8),
+          () => `<rect x="30" y="54" width="300" height="20" rx="6" fill="#dfeecf"/>` + [0, 1, 2, 3, 4, 5].map(i => cilCell(55 + i * 50, 120, 1)).join("") + box(128, 60, 44, 106)
+            + `<text x="180" y="200" text-anchor="middle" font-size="13" class="lbl">cells side by side, lining the windpipe</text>`,
+          () => lungs(180, 110, 1.9) + box(172, 30, 16, 16) + `<text x="232" y="40" font-size="13" class="lbl">windpipe</text><text x="290" y="170" font-size="13" class="lbl" text-anchor="middle">lungs</text>`,
+          () => `<ellipse cx="180" cy="44" rx="30" ry="34" fill="#f1dcc8" stroke="#b08a6a" stroke-width="2"/><path d="M180 76 V100" stroke="#c9a3a3" stroke-width="8"/><path d="M170 50 Q180 58 188 52" stroke="#b4531f" stroke-width="3" fill="none"/>`
+            + lungs(180, 150, 1) + box(128, 86, 104, 132)
+            + `<text x="232" y="48" font-size="13" class="lbl">nose and mouth</text><text x="200" y="104" font-size="13" class="lbl">windpipe</text><text x="240" y="190" font-size="13" class="lbl">lungs</text>`,
+          () => `<circle cx="180" cy="32" r="20" fill="#f1dcc8" stroke="#b08a6a" stroke-width="2"/><rect x="152" y="54" width="56" height="90" rx="20" fill="#9cc6e8"/>
+            <path d="M156 64 L124 126 M204 64 L236 126 M166 142 L158 214 M194 142 L202 214" stroke="#9cc6e8" stroke-width="14" stroke-linecap="round"/>` + lungs(180, 88, 0.42) + box(156, 58, 48, 50),
+        ],
+        tree: [
+          () => palCell(180, 118, 1.6),
+          () => `<rect x="30" y="40" width="300" height="12" fill="#f7fbf2" stroke="#9cc38a"/>` + Array.from({ length: 7 }, (_, i) => palCell(66 + i * 38, 110, 0.6)).join("") + box(126, 74, 28, 72)
+            + `<ellipse cx="120" cy="178" rx="16" ry="12" fill="#dcefcf" stroke="#6aa55a"/><ellipse cx="170" cy="182" rx="16" ry="12" fill="#dcefcf" stroke="#6aa55a"/><ellipse cx="220" cy="178" rx="16" ry="12" fill="#dcefcf" stroke="#6aa55a"/>`
+            + `<text x="180" y="212" text-anchor="middle" font-size="13" class="lbl">tall cells packed side by side, under the top of the leaf</text>`,
+          () => `<path d="M60 120 Q180 10 310 110 Q180 220 60 120 Z" fill="#6fbf5a" stroke="#3f7f31" stroke-width="3"/><path d="M40 122 L310 110 M130 116 L170 70 M130 118 L170 160 M220 112 L250 76 M220 114 L250 150" stroke="#3f7f31" stroke-width="2" fill="none"/>` + box(190, 98, 20, 20)
+            + `<text x="180" y="210" text-anchor="middle" font-size="13" class="lbl">a leaf, with its veins</text>`,
+          () => `<rect x="0" y="200" width="360" height="40" fill="#e3d2b6"/>` + shoot(180, 132, 1.3) + box(212, 80, 50, 40)
+            + `<text x="300" y="60" font-size="13" class="lbl" text-anchor="middle">flower</text><text x="300" y="150" font-size="13" class="lbl" text-anchor="middle">leaves</text><text x="110" y="190" font-size="13" class="lbl" text-anchor="middle">stem</text>`,
+          () => `<rect x="0" y="150" width="360" height="90" fill="#e3d2b6"/>` + shoot(180, 100, 0.8)
+            + `<path d="M180 148 V200 M180 170 L150 200 M180 170 L210 204 M180 190 L160 220 M180 188 L204 224" stroke="#b08a6a" stroke-width="3" fill="none"/>` + box(144, 44, 72, 108)
+            + `<text x="300" y="200" font-size="13" class="lbl" text-anchor="middle">root system</text><text x="300" y="80" font-size="13" class="lbl" text-anchor="middle">shoot system</text>`,
+        ],
       };
-      let path = "human", lv = 0;
-      shell(`${pickRow("path", [["human", "🧍 Human"], ["tree", "🌻 Plant"]], path)}
-        <div class="card" style="text-align:center"><div id="zpic" style="font-size:64px;line-height:1.2;min-height:84px"></div>
-          <div id="zname" style="font-size:1.3em;font-weight:700"></div><div class="muted" id="zdesc"></div></div>
-        <div class="ctrl slider"><label for="zl">Zoom out</label><input type="range" id="zl" min="0" max="4" value="0"></div>
-        <div class="readout" id="ladder"></div><p class="muted" id="msg">Slide to zoom out. Smallest first: cell, tissue, organ, organ system.</p>`);
-      function render() {
-        const L = PATHS[path][lv];
-        el("zpic").textContent = L[2]; el("zname").textContent = L[0]; el("zdesc").textContent = L[1];
-        el("ladder").innerHTML = PATHS[path].map((x, i) => `<span class="chip" style="${i === lv ? "border-color:var(--brand)" : i > lv ? "opacity:.4" : ""}">${x[0]}</span>`).join(" → ");
+      let path = "human", lv = 0, zt = 1;
+      const r = shell(`${pickRow("path", "Zoom out from:", [["human", "🧍 a human cell"], ["tree", "🌻 a plant cell"]], path)}
+        <svg class="scene" viewBox="0 0 360 240" role="img" aria-label="A drawing of the current level"><g id="zg"></g></svg>
+        <p class="jobline"><b id="zname"></b> — <span id="zdesc"></span></p>
+        <div class="ctrl slider"><label for="zl">Zoom in</label><input type="range" id="zl" min="0" max="4" value="0"><label for="zl">Zoom out</label></div>
+        <div class="readout" id="ladder"></div>
+        <p class="muted" id="msg">Slide to zoom out. The blue box shows where you just were.</p>`);
+      function render(animate) {
+        const L = (path === "human" ? HUMAN : PLANT)[lv];
+        el("zname").textContent = L[0]; el("zdesc").textContent = L[1];
+        el("ladder").innerHTML = (path === "human" ? HUMAN : PLANT).map((x, i) => `<span class="chip" style="${i === lv ? "border-color:var(--brand)" : i > lv ? "opacity:.45" : ""}">${i + 1}. ${x[0]}</span>`).join("");
+        el("zg").innerHTML = DRAW[path][lv]();
+        zt = animate ? 0 : 1;
+        if (!animate) { el("zg").removeAttribute("transform"); el("zg").setAttribute("opacity", 1); }
         if (lv === 4) { api.found(path); say(path === "human" ? "From one cell to a whole person. A ciliated cell belongs to the respiratory system." : "From one palisade cell to a whole plant."); }
+        else say("Smallest first: cell, tissue, organ, organ system, organism.");
       }
-      el("zl").oninput = () => { lv = +el("zl").value; render(); };
-      wirePick("path", p => { path = p; lv = 0; el("zl").value = 0; render(); });
-      render();
+      (function loop() {
+        if (!alive(r)) return;
+        if (zt < 1) {
+          zt = Math.min(1, zt + 0.06);
+          const [fx, fy] = (path === "human" ? HUMAN : PLANT)[lv][2], s = 1 + 1.6 * (1 - zt) ** 2;
+          el("zg").setAttribute("transform", `translate(${fx} ${fy}) scale(${s.toFixed(3)}) translate(${-fx} ${-fy})`);
+          el("zg").setAttribute("opacity", (0.3 + 0.7 * zt).toFixed(2));
+        }
+        requestAnimationFrame(loop);
+      })();
+      el("zl").oninput = () => { const nl = +el("zl").value, out = nl > lv; lv = nl; render(out); };
+      wirePick("path", p => { path = p; lv = 0; el("zl").value = 0; render(false); });
+      render(false);
     }
 
     draw();
@@ -1841,6 +1994,10 @@ ARCADE.toy({
 // hydrogencarbonate indicator tubes they fill themselves, one carbon atom they walk round the
 // cycle, and a planet whose thermostat they turn with fuel and forests. Setting the ethanol on
 // fire is a discovery, not a fail — it is exactly why the burner goes off first.
+//
+// Layout rules (from the 23 Sep audit): every drawing is an svg.scene that stays inside its own
+// viewBox, no label smaller than 12 units, readouts live in HTML chips rather than in the picture,
+// and option pickers use .ctrl.pick so they never look like another row of tabs.
 ARCADE.toy({
   id: "g08-u01-leaflab", unit: "g08-u01", order: 1,
   name: "Leaf Lab", icon: "🌿",
@@ -1878,13 +2035,13 @@ ARCADE.toy({
 
     function shell(inner) {
       run++;
-      root.innerHTML = `<div class="ctrl">${tabs.map(([k, n]) =>
+      root.innerHTML = `<div class="ctrl tabs">${tabs.map(([k, n]) =>
         `<button data-tab="${k}" class="${k === tab ? "on" : ""}">${n}</button>`).join("")}</div><div id="bench">${inner}</div>`;
       root.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { tab = b.dataset.tab; draw(); });
       return run;
     }
     function draw() { ({ pond: pondBench, starch: starchBench, ind: indBench, cycle: cycleBench, planet: planetBench })[tab](); }
-    const pickRow = (attr, list, on) => `<div class="ctrl">${list.map(([k, n]) => `<button data-${attr}="${k}" class="${k === on ? "on" : ""}">${n}</button>`).join("")}</div>`;
+    const pickRow = (attr, lead, list, on) => `<div class="ctrl pick"><span class="lead">${lead}</span>${list.map(([k, n]) => `<button data-${attr}="${k}" class="${k === on ? "on" : ""}">${n}</button>`).join("")}</div>`;
     const wirePick = (attr, fn) => root.querySelectorAll(`[data-${attr}]`).forEach(b => b.onclick = () => {
       root.querySelectorAll(`[data-${attr}]`).forEach(x => x.classList.toggle("on", x === b)); fn(b.dataset[attr]);
     });
@@ -1894,38 +2051,53 @@ ARCADE.toy({
     // is going as fast as it can. The student's counts carry a little scatter, so the curve of best
     // fit is something they see emerge rather than a line through perfect dots.
     function pondBench() {
-      let d = 30, on = true, gas = 0, since = 0, phase = 0, counting = 0, counted = 0, bubbles = [], pts = {}, off = 0;
+      let d = 30, on = true, gas = 0, since = 0, counting = 0, counted = 0, bubbles = [], pts = {}, off = 0, splint = 0;
       const rate = () => { if (!on) return 0; const I = (10 / d) ** 2; return 70 * I / (I + 0.6); };   // bubbles a minute
-      const r = shell(`<svg viewBox="0 0 400 260" id="psvg" role="img" aria-label="Pondweed in a beaker under a lamp, and a graph" style="touch-action:none">
-          <rect x="30" y="100" width="110" height="130" fill="#dbeaf6" stroke="#7f8c99" stroke-width="3"/>
-          <path d="M85 225 q-10 -30 0 -60 q10 -30 0 -50 M85 205 q14 -10 20 -24 M85 185 q-16 -8 -22 -22" stroke="#2e8b57" stroke-width="5" fill="none"/>
-          <path d="M60 170 L85 140 L110 170" fill="none" stroke="#9aa6b3" stroke-width="3"/>
-          <rect x="77" y="60" width="16" height="84" rx="8" fill="#eef5fb" stroke="#7f8c99" stroke-width="2"/>
-          <rect id="gas" x="79" y="62" width="12" height="0" fill="#fff"/>
-          <g id="bub"></g>
-          <g id="lamp" class="grab"><rect x="-14" y="120" width="28" height="30" rx="4" fill="#5b6675"/><path d="M-14 150 L-24 176 L24 176 L14 150 Z" fill="#8d97a3"/>
-            <path id="beam" d="M-20 176 L-90 200 L-90 150 Z" fill="#f2d24c" opacity=".35"/></g>
-          <text x="200" y="250" text-anchor="middle" font-size="12" fill="#5b6675" id="dist"></text>
-          <rect x="248" y="24" width="140" height="130" fill="none" stroke="#c9d2db" stroke-width="2"/>
-          <text x="318" y="170" text-anchor="middle" font-size="11" fill="#5b6675">distance from lamp (cm) →</text>
-          <text x="244" y="18" font-size="11" fill="#5b6675">bubbles per minute</text><g id="plot"></g>
-        </svg>
+      const lampX = () => 170 + (d - 5) * 2.3;
+      const r = shell(`<div class="duo">
+          <svg class="scene" viewBox="0 0 300 250" id="psvg" role="img" aria-label="Pondweed in a beaker of water under a funnel and test tube, with a lamp you can move" style="touch-action:none">
+            <rect x="18" y="86" width="126" height="138" fill="#dbeaf6"/>
+            <path d="M18 70 V224 H144 V70" fill="none" stroke="#7f8c99" stroke-width="3"/>
+            <path d="M81 214 q-10 -26 0 -50 q8 -18 0 -30 M81 196 q14 -8 20 -22 M81 178 q-15 -6 -21 -20" stroke="#2e8b57" stroke-width="5" fill="none" stroke-linecap="round"/>
+            <path d="M44 184 L74 150 V132 M118 184 L88 150 V132" fill="none" stroke="#9aa6b3" stroke-width="3"/>
+            <path d="M72 136 V48 Q72 38 81 38 Q90 38 90 48 V136" fill="#eef5fb" stroke="#7f8c99" stroke-width="2.5"/>
+            <rect id="gas" x="74" y="41" width="14" height="0" fill="#ffffff" stroke="#cfd8e2"/>
+            <g id="bub"></g><g id="spl"></g>
+            <path id="beam" d="" fill="#f2d24c" opacity=".35"/>
+            <g id="lamp" style="cursor:grab"><path d="M0 104 V224" stroke="#5b6675" stroke-width="5"/><rect x="-18" y="220" width="36" height="8" rx="3" fill="#5b6675"/>
+              <path d="M-4 92 L14 78 L14 132 L-4 118 Z" fill="#5b6675"/><circle cx="-4" cy="105" r="9" fill="#fff4b0" stroke="#8d97a3" stroke-width="2" id="bulb"/></g>
+            <path id="ruler" d="" stroke="#5b6675" stroke-width="2"/><text id="dist" x="0" y="246" text-anchor="middle" font-size="13" font-weight="bold"></text>
+            <text x="81" y="30" text-anchor="middle" font-size="13" class="lbl">gas collects here</text>
+            <text x="92" y="216" font-size="12" class="lbl">pondweed</text>
+          </svg>
+          <svg class="scene" viewBox="0 0 300 250" role="img" aria-label="Your graph of bubbles per minute against distance from the lamp">
+            <g id="axes"></g><g id="plot"></g>
+          </svg>
+        </div>
+        <div class="readout"><span class="chip" id="rt"></span><span class="chip" id="gs"></span></div>
         <div class="ctrl slider"><label for="ds">Lamp distance</label><input type="range" id="ds" min="5" max="50" value="30"><span class="chip" id="dsv">30 cm</span></div>
-        <div class="ctrl"><button id="sw">💡 Lamp off</button><button id="cnt">⏱️ Count for one minute</button><button id="spl">🔥 Test the gas</button></div>
-        <p class="muted" id="msg">Drag the lamp, or use the slider. Count the bubbles at different distances.</p>`);
+        <div class="ctrl"><button id="cnt">⏱️ Count bubbles for one minute</button><button id="sw">💡 Switch the lamp off</button><button id="spb">🔥 Test the gas</button></div>
+        <p class="muted" id="msg">Drag the lamp or use the slider. Count the bubbles at five different distances to draw your graph.</p>`);
       const svg = el("psvg");
+      // Axes drawn once: distance 0–50 cm across, 0–70 bubbles up.
+      const GX = x => 52 + 228 * x / 50, GY = y => 204 - 184 * y / 70;
+      el("axes").innerHTML = `<path d="M52 20 V204 H280" fill="none" stroke="#5b6675" stroke-width="2"/>`
+        + [0, 10, 20, 30, 40, 50].map(x => `<path d="M${GX(x)} 204 v5" stroke="#5b6675"/><text x="${GX(x)}" y="222" text-anchor="middle" font-size="12" class="lbl">${x}</text>`).join("")
+        + [0, 20, 40, 60].map(y => `<path d="M47 ${GY(y)} h5" stroke="#5b6675"/><path d="M52 ${GY(y)} H280" class="edge" stroke-width="1"/><text x="43" y="${GY(y) + 4}" text-anchor="end" font-size="12" class="lbl">${y}</text>`).join("")
+        + `<text x="166" y="242" text-anchor="middle" font-size="13" class="lbl">distance from lamp (cm)</text>`
+        + `<text x="14" y="112" text-anchor="middle" font-size="13" class="lbl" transform="rotate(-90 14 112)">bubbles per minute</text>`;
       const setD = v => { d = Math.max(5, Math.min(50, Math.round(v))); el("ds").value = d; el("dsv").textContent = d + " cm"; };
       el("ds").oninput = () => setD(+el("ds").value);
-      el("sw").onclick = () => { on = !on; off = 0; el("sw").textContent = on ? "💡 Lamp off" : "💡 Lamp on"; say(on ? "Light on." : "Dark. Watch the bubbles."); };
+      el("sw").onclick = () => { on = !on; off = 0; el("sw").textContent = on ? "💡 Switch the lamp off" : "💡 Switch the lamp on"; say(on ? "Light on." : "Dark. Watch the bubbles."); };
       el("cnt").onclick = () => { if (counting) return; counting = 4; counted = 0; say(`Counting at ${d} cm… (one minute, sped up)`); };
-      el("spl").onclick = () => {
+      el("spb").onclick = () => {
         if (gas < 40) { say("Not enough gas in the tube yet. Let the plant bubble for longer — a closer lamp helps."); return; }
-        api.found("relight"); gas = 0;
+        api.found("relight"); gas = 0; splint = 2.5;
         say("The glowing splint RELIGHTS. The gas is oxygen — a product of photosynthesis.");
       };
       let dragging = false;
       el("lamp").addEventListener("pointerdown", e => { dragging = true; el("lamp").setPointerCapture(e.pointerId); });
-      svg.addEventListener("pointermove", e => { if (!dragging) return; const b = svg.getBoundingClientRect(); setD(((e.clientX - b.left) / b.width * 400 - 150) / 1.9 + 5); });
+      svg.addEventListener("pointermove", e => { if (!dragging) return; const b = svg.getBoundingClientRect(); setD(((e.clientX - b.left) / b.width * 300 - 170) / 2.3 + 5); });
       addEventListener("pointerup", () => { dragging = false; });
       let last = performance.now();
       (function loop(now) {
@@ -1934,7 +2106,7 @@ ARCADE.toy({
         const speed = counting ? 15 : 4;                 // plant-seconds per real second: a counted minute takes 4 s
         since += dt * rate() / 60 * speed;
         while (since >= 1) {
-          since -= 1; bubbles.push({ x: 85 + (Math.random() - 0.5) * 20, y: 150 }); gas = Math.min(80, gas + 0.4);
+          since -= 1; bubbles.push({ x: 81 + (Math.random() - 0.5) * 16, y: 164 }); gas = Math.min(80, gas + 0.4);
           if (counting) counted++;
           api.found("bubbles");
         }
@@ -1947,18 +2119,24 @@ ARCADE.toy({
             if (Object.keys(pts).length >= 5) { api.found("graph"); say(`${got} bubbles at ${d} cm. The nearer the lamp, the more light — and the faster the plant photosynthesises.`); }
           }
         }
-        bubbles = bubbles.filter(b => (b.y -= dt * 60) > 144);
-        phase += dt;
-        el("bub").innerHTML = bubbles.map(b => `<circle cx="${b.x}" cy="${b.y}" r="3" fill="#fff" stroke="#7fa6c9"/>`).join("");
-        el("gas").setAttribute("height", gas);
-        el("lamp").setAttribute("transform", `translate(${150 + (d - 5) * 1.9} 0)`);
-        el("beam").setAttribute("opacity", on ? 0.45 * Math.min(1, 10 / d) + 0.1 : 0);
-        el("dist").textContent = `lamp ${d} cm away${d < 8 ? " — keep the lamp and wires away from the water!" : ""}`;
-        const px = x => 248 + 140 * x / 50, py = y => 154 - 130 * y / 70;
+        if (splint > 0) splint -= dt;
+        bubbles = bubbles.filter(b => (b.y -= dt * 60) > 140);
+        el("bub").innerHTML = bubbles.map(b => `<circle cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="3" fill="#fff" stroke="#7fa6c9"/>`).join("");
+        el("gas").setAttribute("height", (gas * 1.1).toFixed(1));
+        el("spl").innerHTML = splint > 0 ? `<path d="M140 12 L96 40" stroke="#b08a6a" stroke-width="4" stroke-linecap="round"/><path d="M92 44 q-6 -12 4 -20 q2 10 8 6 q0 10 -12 14 Z" fill="#f28c1e"/>` : "";
+        const lx = lampX();
+        el("lamp").setAttribute("transform", `translate(${lx.toFixed(1)} 0)`);
+        el("bulb").setAttribute("fill", on ? "#fff4b0" : "#c9d2db");
+        el("beam").setAttribute("d", on ? `M${(lx - 12).toFixed(1)} 96 L146 90 L146 196 L${(lx - 12).toFixed(1)} 114 Z` : "");
+        el("beam").setAttribute("opacity", (0.12 + 0.45 * Math.min(1, 10 / d)).toFixed(2));
+        el("ruler").setAttribute("d", `M146 236 H${lx.toFixed(1)} M146 232 v8 M${lx.toFixed(1)} 232 v8`);
+        el("dist").setAttribute("x", ((146 + lx) / 2).toFixed(1)); el("dist").textContent = d + " cm";
+        el("rt").textContent = on ? `about ${Math.round(rate())} bubbles a minute` : "no bubbles — lamp off";
+        el("gs").textContent = gas >= 40 ? "enough gas to test ✔" : `gas collected: ${Math.round(gas / 40 * 100)}% of a test`;
         const keys = Object.keys(pts).map(Number).sort((a, b) => a - b);
-        const curve = keys.length >= 4 ? `<path d="${Array.from({ length: 46 }, (_, i) => { const x = 5 + i; const I = (10 / x) ** 2; return `${i ? "L" : "M"}${px(x).toFixed(1)} ${py(70 * I / (I + 0.6)).toFixed(1)}`; }).join(" ")}" fill="none" stroke="#2e8b57" stroke-width="2"/>` : "";
-        el("plot").innerHTML = curve + keys.map(k => `<path d="M${px(k) - 4} ${py(pts[k]) - 4} l8 8 m0 -8 l-8 8" stroke="#b4531f" stroke-width="2"/>`).join("")
-          + `<path d="M${px(d)} 154 l-4 8 h8 Z" fill="#2f6f9f"/>`;
+        const curve = keys.length >= 4 ? `<path d="${Array.from({ length: 46 }, (_, i) => { const x = 5 + i; const I = (10 / x) ** 2; return `${i ? "L" : "M"}${GX(x).toFixed(1)} ${GY(70 * I / (I + 0.6)).toFixed(1)}`; }).join(" ")}" fill="none" stroke="#2e8b57" stroke-width="2.5"/><text x="276" y="${GY(12)}" text-anchor="end" font-size="12" fill="#2e8b57">curve of best fit</text>` : "";
+        el("plot").innerHTML = curve + keys.map(k => `<path d="M${GX(k) - 5} ${GY(pts[k]) - 5} l10 10 m0 -10 l-10 10" stroke="#b4531f" stroke-width="2.5"/>`).join("")
+          + `<path d="M${GX(d)} 206 l-5 9 h10 Z" fill="#2f6f9f"/>` + (keys.length ? "" : `<text x="166" y="110" text-anchor="middle" font-size="13" class="lbl">your counts will appear here</text>`);
         requestAnimationFrame(loop);
       })(performance.now());
       setD(30);
@@ -1968,26 +2146,36 @@ ARCADE.toy({
     // Every button works in any order. The leaf only tells the truth when the steps go in the order
     // the textbook gives, and each shortcut shows its own reason for the step it skipped.
     function starchBench() {
-      let leaf = "light", burner = true, boiled = false, ethanol = false, soft = false, iodine = false, fire = 0;
-      const r = shell(`${pickRow("lf", [["light", "☀️ Leaf from a plant in the light"], ["darkp", "🌑 Leaf from a plant kept in the dark"]], "light")}
-        <svg viewBox="0 0 400 220" role="img" aria-label="A variegated leaf, a beaker over a burner, and a tube of ethanol">
-          <rect x="30" y="80" width="90" height="90" fill="#dbeaf6" stroke="#7f8c99" stroke-width="3"/>
-          <rect x="62" y="40" width="26" height="110" rx="10" fill="#f6f2e0" stroke="#7f8c99" stroke-width="2" id="tube" opacity="0"/>
-          <path id="flame" d="M60 195 Q75 170 90 195 Z" fill="#f2b705"/><rect x="66" y="196" width="18" height="18" fill="#8d97a3"/>
-          <g id="fire"></g>
-          <g transform="translate(270 110)"><rect x="-110" y="70" width="220" height="20" fill="#fff" stroke="#c9d2db" opacity="0" id="tile"/>
-            <path id="leafO" d="M0 -90 C70 -60 80 40 0 80 C-80 40 -70 -60 0 -90 Z" fill="#f1f1e6" stroke="#7f8c99" stroke-width="2"/>
-            <path id="leafI" d="M0 -66 C46 -44 52 28 0 56 C-52 28 -46 -44 0 -66 Z" fill="#3aa655"/>
-            <path d="M0 -90 L0 80" stroke="#7f8c99" stroke-width="1.5"/><path id="cracks" d="" stroke="#5b3" stroke-width="0" fill="none"/></g>
-          <text x="270" y="16" text-anchor="middle" font-size="12" fill="#5b6675" id="state"></text>
+      let leaf = "light", burner = true, boiled = false, ethanol = false, soft = false, iodine = false, fire = 0, at = 0, log = [];
+      const r = shell(`${pickRow("lf", "Leaf:", [["light", "☀️ from a plant in the light"], ["darkp", "🌑 from a plant kept in the dark"]], "light")}
+        <svg class="scene" viewBox="0 0 360 264" role="img" aria-label="The leaf being tested, and the four places it can go: boiling water, ethanol, warm water and the white tile">
+          <g transform="translate(180 62)">
+            <path id="leafO" d="M0 -56 C46 -38 52 24 0 52 C-52 24 -46 -38 0 -56 Z" fill="#f1f1e6" stroke="#7f8c99" stroke-width="2"/>
+            <path id="leafI" d="M0 -40 C30 -26 34 16 0 36 C-34 16 -30 -26 0 -40 Z" fill="#3aa655"/>
+            <path d="M0 -56 L0 52" stroke="#7f8c99" stroke-width="1.5"/><path id="cracks" d="M-24 -14 L-8 0 L-20 16 M16 -30 L26 -8 M12 22 L28 36" stroke="#5b6675" stroke-width="0" fill="none"/></g>
+          <text x="180" y="136" text-anchor="middle" font-size="13" class="lbl" id="lfnote">the leaf</text>
+          <g id="st1"><rect x="22" y="144" width="76" height="80" rx="10" fill="none" class="edge" stroke-width="2"/>
+            <path d="M34 152 V198 H86 V152" fill="#dbeaf6" stroke="#7f8c99" stroke-width="2.5"/><path id="flame" d="M52 214 Q60 199 68 214 Z" fill="#f2b705"/><rect x="50" y="214" width="20" height="8" rx="2" fill="#8d97a3"/></g>
+          <g id="st2"><rect x="106" y="144" width="76" height="80" rx="10" fill="none" class="edge" stroke-width="2"/>
+            <path d="M118 158 V206 H170 V158" fill="#e9f1f8" stroke="#7f8c99" stroke-width="2.5"/>
+            <rect x="136" y="150" width="16" height="52" rx="7" fill="#f7f4e0" stroke="#7f8c99" stroke-width="2" id="eth"/></g>
+          <g id="st3"><rect x="190" y="144" width="76" height="80" rx="10" fill="none" class="edge" stroke-width="2"/>
+            <path d="M200 188 V204 H256 V188" fill="#e3eef8" stroke="#7f8c99" stroke-width="2.5"/></g>
+          <g id="st4"><rect x="274" y="144" width="76" height="80" rx="10" fill="none" class="edge" stroke-width="2"/>
+            <rect x="284" y="194" width="56" height="10" fill="#fff" stroke="#c9d2db"/><path d="M322 160 v14" stroke="#8a5a12" stroke-width="3"/><rect x="316" y="150" width="12" height="12" rx="2" fill="#8a5a12"/></g>
+          <g id="mini"></g><g id="fire"></g>
+          ${[[60, "boiling", "water"], [144, "ethanol in", "hot water"], [228, "warm", "water"], [312, "white tile", "+ iodine"]].map(([x, a, b]) =>
+            `<text x="${x}" y="242" text-anchor="middle" font-size="14" class="lbl">${a}</text><text x="${x}" y="258" text-anchor="middle" font-size="14" class="lbl">${b}</text>`).join("")}
         </svg>
-        <div class="ctrl"><button id="b1">🫧 Boil the leaf in water</button><button id="b2">🔥 Burner off</button>
-          <button id="b3">🧴 Put the leaf in ethanol</button><button id="b4">💧 Dip in warm water</button><button id="b5">🟤 Add iodine on a white tile</button></div>
-        <div class="ctrl"><button id="new">🍃 New leaf</button></div>
+        <div class="readout" id="log"></div>
+        <div class="ctrl"><button id="b1">🫧 Boil the leaf in water</button><button id="b2">🔥 Turn the burner off</button>
+          <button id="b3">🧴 Put the leaf in ethanol</button><button id="b4">💧 Dip in warm water</button><button id="b5">🟤 Spread on the tile, add iodine</button></div>
+        <div class="ctrl"><button id="new">🍃 Start again with a new leaf</button></div>
         <p class="muted" id="msg">Test the leaf for starch. Do the steps in any order you like — and see what happens.</p>`);
+      const STX = [0, 60, 144, 228, 312];
       const colourOf = () => {
         if (!iodine) return [ethanol ? "#f1efd8" : "#3aa655", "#f1f1e6"];
-        if (!boiled) return [ethanol ? "#d59a4a" : "#6d7a2e", "#d59a4a"];            // iodine cannot get in: orange-brown
+        if (!boiled) return ["#6d7a2e", "#d59a4a"];                                    // iodine cannot get in: orange-brown
         const starch = leaf === "light";
         if (!ethanol) return [starch ? "#1f3326" : "#5f6a2c", "#d59a4a"];              // green hides the result
         return [starch ? "#1b1d4a" : "#d59a4a", "#d59a4a"];
@@ -1997,27 +2185,27 @@ ARCADE.toy({
         const [inner, outer] = colourOf();
         el("leafI").setAttribute("fill", inner); el("leafO").setAttribute("fill", outer);
         el("flame").setAttribute("opacity", burner ? 1 : 0);
-        el("tube").setAttribute("opacity", ethanol ? 1 : 0);
-        el("tube").setAttribute("fill", ethanol ? "#cfe8b5" : "#f6f2e0");
-        el("tile").setAttribute("opacity", iodine ? 1 : 0);
+        el("eth").setAttribute("fill", ethanol ? "#b7d98f" : "#f7f4e0");
         el("cracks").setAttribute("stroke-width", iodine && ethanol && !soft ? 2 : 0);
-        el("cracks").setAttribute("d", "M-30 -20 L-10 0 L-26 20 M20 -40 L34 -10 M16 30 L36 50");
-        el("b2").textContent = burner ? "🔥 Burner off" : "🔥 Burner on";
-        el("state").textContent = [boiled && "boiled", !burner && "burner off", ethanol && "chlorophyll out", soft && "softened", iodine && "iodine on"].filter(Boolean).join(" · ");
+        el("lfnote").textContent = iodine ? (!boiled ? "orange-brown: iodine could not get in" : !ethanol ? "too green to see" : leaf === "light" ? "blue-black = starch" : "orange-brown = no starch") : ethanol ? "pale — the green is out" : "the leaf";
+        [1, 2, 3, 4].forEach(i => el("st" + i).firstElementChild.setAttribute("stroke", i === at ? "#2f6f9f" : ""));
+        el("mini").innerHTML = at ? `<g transform="translate(${STX[at]} ${at === 4 ? 186 : at === 3 ? 184 : at === 2 ? 170 : 176}) scale(.22)"><path d="M0 -56 C46 -38 52 24 0 52 C-52 24 -46 -38 0 -56 Z" fill="${outer}" stroke="#5b6675" stroke-width="6"/><path d="M0 -40 C30 -26 34 16 0 36 C-34 16 -30 -26 0 -40 Z" fill="${inner}"/></g>` : "";
+        el("log").innerHTML = log.length ? `<span class="chip">Your order: ${log.join(" → ")}</span>` : "";
+        el("b2").textContent = burner ? "🔥 Turn the burner off" : "🔥 Turn the burner on";
       }
       wirePick("lf", v => { leaf = v; reset(); say(v === "light" ? "A green-and-white leaf from a plant that stood in the sun." : "A leaf from the same kind of plant, kept in the dark for two days."); });
-      function reset() { burner = true; boiled = ethanol = soft = iodine = false; render(); }
+      function reset() { burner = true; boiled = ethanol = soft = iodine = false; at = 0; log = []; render(); }
       el("new").onclick = () => { reset(); say("A fresh leaf."); };
       el("b1").onclick = () => {
-        if (iodine) { say("Already tested. Take a new leaf."); return; }
+        if (iodine) { say("Already tested. Start again with a new leaf."); return; }
         if (!burner) { say("The burner is off — turn it on to boil the water."); return; }
-        boiled = true; say("Boiling breaks the cell membranes, so the iodine will be able to reach the starch.");
+        boiled = true; at = 1; log.push("boil"); say("Boiling breaks the cell membranes, so the iodine will be able to reach the starch.");
         render();
       };
       el("b2").onclick = () => {
-        burner = !burner; render();
+        burner = !burner; log.push(burner ? "burner on" : "burner off"); render();
         if (burner && ethanol && !iodine) { fire = 1.4; api.found("whoosh"); say("WHOOSH! The ethanol is still there and it is very flammable. Keep the burner off while ethanol is out."); return; }
-        say(burner ? "Burner on." : "Burner off. Now it is safe to use ethanol.");
+        say(burner ? "Burner on." : "Burner off. Now it is safe to use ethanol — the hot water will heat it.");
       };
       el("b3").onclick = () => {
         if (burner) {
@@ -2026,12 +2214,12 @@ ARCADE.toy({
           return;
         }
         if (!boiled) { say("The ethanol cannot get into the cells yet. Boil the leaf first."); return; }
-        ethanol = true; say("The green chlorophyll dissolves out into the ethanol. The leaf goes pale — and brittle.");
+        ethanol = true; at = 2; log.push("ethanol"); say("The green chlorophyll dissolves out into the ethanol. The leaf goes pale — and brittle.");
         render();
       };
-      el("b4").onclick = () => { if (!ethanol) { say("Nothing to soften yet."); return; } soft = true; say("Warm water softens the brittle leaf so it can be spread out flat."); render(); };
+      el("b4").onclick = () => { if (!ethanol) { say("Nothing to soften yet."); return; } soft = true; at = 3; log.push("warm water"); say("Warm water softens the brittle leaf so it can be spread out flat."); render(); };
       el("b5").onclick = () => {
-        iodine = true; render();
+        iodine = true; at = 4; log.push("iodine"); render();
         if (!boiled) { say("It stays orange-brown: the iodine could not get through the cell membranes. Boil first."); return; }
         if (!ethanol) { api.found("hidden"); say("The leaf is too green to tell — the chlorophyll hides the colour change. Take the green out with ethanol first."); return; }
         const crack = soft ? "" : " (It cracked when you spread it — warm water would have softened it.)";
@@ -2041,7 +2229,7 @@ ARCADE.toy({
       (function loop() {
         if (!alive(r)) return;
         if (fire > 0) fire -= 0.016;
-        el("fire").innerHTML = fire > 0 ? [0, 1, 2].map(i => `<path d="M${60 + i * 12} 60 Q${66 + i * 12} ${10 - Math.random() * 20} ${72 + i * 12} 60 Z" fill="${i % 2 ? "#f2b705" : "#e0592a"}"/>`).join("") : "";
+        el("fire").innerHTML = fire > 0 ? [0, 1, 2].map(i => `<path d="M${132 + i * 8} 152 Q${136 + i * 8} ${(128 - Math.random() * 10).toFixed(1)} ${142 + i * 8} 152 Z" fill="${i % 2 ? "#f2b705" : "#e0592a"}"/>`).join("") : "";
         requestAnimationFrame(loop);
       })();
       render();
@@ -2051,22 +2239,29 @@ ARCADE.toy({
     function indBench() {
       const MIX = [["none", "Nothing"], ["plant", "🌿 Water plant"], ["mag", "🐛 Maggots"], ["both", "🌿🐛 Both"]];
       let mix = "plant", light = true, co2 = 0.5, t = 0, going = false, rack = [];
-      const r = shell(`<div class="ctrl"><label>In the tube:</label>${MIX.map(([k, n]) => `<button data-mix="${k}" class="${k === mix ? "on" : ""}">${n}</button>`).join("")}</div>
-        ${pickRow("lt", [["on", "☀️ In the light"], ["off", "🌑 In the dark"]], "on")}
-        <svg viewBox="0 0 400 200" role="img" aria-label="A test tube of hydrogencarbonate indicator, and a rack of earlier results">
-          <rect id="bg" x="0" y="0" width="140" height="200" fill="#fff8d6"/>
-          <rect x="50" y="20" width="40" height="150" rx="18" fill="#fff" stroke="#7f8c99" stroke-width="3"/>
-          <rect id="liq" x="53" y="60" width="34" height="107" rx="15" fill="#c0392b"/>
-          <line x1="52" y1="100" x2="88" y2="100" stroke="#7f8c99" stroke-width="3"/><g id="who"></g>
-          <text x="70" y="192" text-anchor="middle" font-size="12" fill="#5b6675" id="clock">0 min</text>
-          <g transform="translate(160 20)"><rect x="0" y="0" width="230" height="16" rx="8" fill="url(#ramp)"/>
-            <text x="0" y="30" font-size="11" fill="#5b6675">purple: none</text><text x="115" y="30" text-anchor="middle" font-size="11" fill="#5b6675">red: a little</text><text x="230" y="30" text-anchor="end" font-size="11" fill="#5b6675">yellow: lots</text>
-            <path id="ptr" d="M0 -2 l-5 -8 h10 Z" fill="#34495e"/></g>
-          <defs><linearGradient id="ramp"><stop offset="0" stop-color="#7b3fa0"/><stop offset=".5" stop-color="#c0392b"/><stop offset="1" stop-color="#f2c12e"/></linearGradient></defs>
-          <g id="rack" transform="translate(160 70)"></g>
-        </svg>
+      const r = shell(`${pickRow("mix", "In the tube:", MIX, mix)}
+        ${pickRow("lt", "Leave it:", [["on", "☀️ in the light"], ["off", "🌑 in the dark"]], "on")}
+        <div class="duo">
+          <svg class="scene" viewBox="0 0 220 250" role="img" aria-label="A test tube of hydrogencarbonate indicator">
+            <rect id="bg" x="0" y="0" width="220" height="250" rx="14" fill="#fff6cc"/>
+            <text id="sky" x="196" y="30" text-anchor="middle" font-size="22">☀️</text>
+            <path d="M88 26 V204 Q88 222 110 222 Q132 222 132 204 V26" fill="#fff" stroke="#7f8c99" stroke-width="3"/>
+            <path id="liq" d="M91 118 V204 Q91 219 110 219 Q129 219 129 204 V118 Z" fill="#c0392b"/>
+            <path d="M89 112 H131" stroke="#5b6675" stroke-width="4" stroke-dasharray="3 3"/><g id="who"></g>
+            <text x="140" y="116" font-size="12" id="pl" class="lbl">platform</text>
+            <text x="140" y="170" font-size="12" id="il" class="lbl">indicator</text>
+            <text x="110" y="242" text-anchor="middle" font-size="14" font-weight="bold" id="clock">0 minutes</text>
+          </svg>
+          <div style="flex:1 1 240px;min-width:0">
+            <div style="height:18px;border-radius:9px;background:linear-gradient(90deg,#7b3fa0,#c0392b 50%,#f2c12e)"></div>
+            <div style="display:flex;justify-content:space-between;font-size:.85em" class="muted"><span>purple:<br>none</span><span style="text-align:center">red:<br>a little</span><span style="text-align:right">yellow:<br>lots</span></div>
+            <p class="muted" style="margin:6px 0 0;font-size:.9em">…carbon dioxide in the water</p>
+            <h3 style="margin:14px 0 6px;font-size:1em">Your results after 30 minutes</h3>
+            <div id="rack" class="muted">Nothing tested yet.</div>
+          </div>
+        </div>
         <div class="ctrl"><button id="go">▶ Leave it for 30 minutes</button></div>
-        <p class="muted" id="msg">The indicator starts red. It shows how much carbon dioxide is in the water.</p>`);
+        <p class="muted" id="msg">The indicator starts red. Choose what goes in the tube and where it goes, then wait.</p>`);
       const colour = c => {       // purple → red → yellow as carbon dioxide rises
         const mixc = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
         const P = [123, 63, 160], R = [192, 57, 43], Y = [242, 193, 46];
@@ -2078,13 +2273,14 @@ ARCADE.toy({
         return (plant ? 0.012 : 0) + (mag ? 0.02 : 0) - (plant && light ? 0.04 : 0);
       };
       const reset = () => { co2 = 0.5; t = 0; going = false; };
-      root.querySelectorAll("[data-mix]").forEach(b => b.onclick = () => { root.querySelectorAll("[data-mix]").forEach(x => x.classList.toggle("on", x === b)); mix = b.dataset.mix; reset(); });
+      wirePick("mix", v => { mix = v; reset(); });
       wirePick("lt", v => { light = v === "on"; reset(); });
       el("go").onclick = () => { reset(); going = true; };
       function finish() {
         going = false;
-        const c = co2, name = MIX.find(m => m[0] === mix)[1] + (light ? " · light" : " · dark");
-        rack = rack.filter(x => x[0] !== name).concat([[name, c]]).slice(-6);
+        const c = co2, name = MIX.find(m => m[0] === mix)[1] + (light ? ", light" : ", dark");
+        rack = rack.filter(x => x[0] !== name).concat([[name, c]]).slice(-8);
+        el("rack").innerHTML = rack.map(([n, cc]) => `<div><span class="swatch" style="background:${colour(cc)}"></span>${n}</div>`).join("");
         if (c > 0.8) api.found("yellow");
         if (c < 0.2) api.found("purple");
         if (mix === "plant" && !light) { api.found("plantdark"); say("Yellow — in the dark the plant only respires, so it adds carbon dioxide. Plants respire all the time, just like animals."); }
@@ -2098,73 +2294,84 @@ ARCADE.toy({
         if (!alive(r)) return;
         if (going) { t += 0.2; co2 = Math.max(0, Math.min(1, co2 + change() * 0.2)); if (t >= 30) finish(); }
         el("liq").setAttribute("fill", colour(co2));
-        el("bg").setAttribute("fill", light ? "#fff8d6" : "#2c3440");
-        el("clock").textContent = Math.round(t) + " min";
-        el("clock").setAttribute("fill", light ? "#5b6675" : "#dfe6ee");
-        el("ptr").setAttribute("transform", `translate(${230 * co2} 0)`);
-        el("who").innerHTML = (mix === "plant" || mix === "both" ? `<path d="M70 165 q-8 -20 0 -40 q8 -15 0 -22" stroke="#2e8b57" stroke-width="4" fill="none"/>` : "")
-          + (mix === "mag" || mix === "both" ? `<text x="62" y="92" font-size="16">🐛</text>` : "");
-        el("rack").innerHTML = rack.map(([n, c], i) => `<g transform="translate(0 ${i * 20})"><rect width="26" height="14" rx="6" fill="${colour(c)}"/><text x="34" y="12" font-size="12" fill="#5b6675">${n}</text></g>`).join("");
+        el("bg").setAttribute("fill", light ? "#fff6cc" : "#2c3440");
+        el("sky").textContent = light ? "☀️" : "🌙";
+        // The panel is a fixed light or dark colour in both themes, so its text is too.
+        el("clock").style.fill = light ? "#1f2a37" : "#eef2f6";
+        ["pl", "il"].forEach(id => el(id).style.fill = light ? "#5b6675" : "#c9d2db");
+        el("clock").textContent = `${Math.round(t)} minutes`;
+        el("who").innerHTML = (mix === "plant" || mix === "both" ? `<path d="M110 214 q-10 -22 0 -44 q8 -16 0 -30 M110 188 q12 -6 14 -18" stroke="#2e8b57" stroke-width="4" fill="none" stroke-linecap="round"/>` : "")
+          + (mix === "mag" || mix === "both" ? `<ellipse cx="102" cy="104" rx="9" ry="4" fill="#efe6c8" stroke="#8a7a50"/><ellipse cx="118" cy="103" rx="9" ry="4" fill="#efe6c8" stroke="#8a7a50"/>` : "");
         requestAnimationFrame(loop);
       })();
     }
 
     // ── one carbon atom ────────────────────────────────────────────────────
+    // The cycle is drawn as the textbook draws it: stores joined by labelled arrows. The arrows the
+    // atom can take from where it is light up and can be tapped; the rest stay grey.
     function cycleBench() {
-      const STORES = { air: [200, 40, "☁️ Air (carbon dioxide)"], plant: [70, 140, "🌳 Plant"], animal: [200, 150, "🐄 Animal"],
-        dead: [300, 200, "🍂 Dead remains"], fuel: [330, 270, "⛽ Fossil fuel"] };
-      const MOVES = {
-        air: [["photo", "Photosynthesis", "plant", "A plant took in carbon dioxide and used light energy to make glucose. The carbon is now in the plant."]],
-        plant: [["resp", "Respiration", "air", "The plant broke down glucose — carbon dioxide back into the air. Plants respire all the time."],
-          ["feed", "Feeding", "animal", "An animal ate the plant. The carbon is now part of the animal."],
-          ["die", "The plant dies", "dead", "The plant died. Its carbon is in the dead leaves and wood."],
-          ["burn", "Combustion (burning wood)", "air", "Burning — the carbon joins with oxygen to make carbon dioxide."]],
-        animal: [["resp", "Respiration", "air", "The animal respired — carbon dioxide breathed out into the air."],
-          ["die", "The animal dies", "dead", "The animal died. Its carbon is in its body and its waste."]],
-        dead: [["decomp", "Decomposition", "air", "Decomposers — bacteria and fungi — broke down the remains and respired. Carbon dioxide into the air."],
-          ["fossil", "Buried with no oxygen", "fuel", "Buried where there is no oxygen, so nothing rots it. Heat and pressure over MILLIONS of years made a fossil fuel."]],
-        fuel: [["burn", "Combustion (burning fuel)", "air", "Burning the fossil fuel releases carbon that was locked away for millions of years."]],
-      };
+      const STORES = { air: [180, 32, 190, "☁️ Air (carbon dioxide)"], plant: [75, 150, 96, "🌳 Plants"], animal: [290, 150, 100, "🐄 Animals"],
+        dead: [88, 236, 140, "🍂 Dead remains"], fuel: [262, 300, 140, "⛽ Fossil fuels"] };
+      const ARROWS = [   // key, from, to, path, label, label x, y, anchor, rotate, what happened
+        ["photo", "air", "plant", "M120 50 C60 56 50 96 54 130", "photosynthesis", 38, 84, "middle", -90, "A plant took in carbon dioxide and used light energy to make glucose. The carbon is now in the plant."],
+        ["resp", "plant", "air", "M112 133 Q170 110 186 52", "respiration", 150, 98, "end", 0, "The plant broke down glucose — carbon dioxide back into the air. Plants respire all the time."],
+        ["feed", "plant", "animal", "M123 150 H236", "feeding", 180, 141, "middle", 0, "An animal ate the plant. The carbon is now part of the animal."],
+        ["resp2", "animal", "air", "M284 133 Q280 80 252 52", "respiration", 272, 100, "end", 0, "The animal respired — carbon dioxide breathed out into the air."],
+        ["die", "plant", "dead", "M62 167 V216", "death", 68, 196, "start", 0, "The plant died. Its carbon is in the dead leaves and wood."],
+        ["die2", "animal", "dead", "M262 167 L152 226", "death", 214, 212, "start", 0, "The animal died. Its carbon is in its body and its waste."],
+        ["decomp", "dead", "air", "M24 219 C-2 160 -2 60 82 32", "decomposition", -10, 150, "middle", -90, "Decomposers — bacteria and fungi — broke down the remains and respired. Carbon dioxide into the air."],
+        ["fossil", "dead", "fuel", "M100 253 Q120 300 184 300", "millions of years", 96, 322, "middle", 0, "Buried where there is no oxygen, so nothing rots it. Heat and pressure over MILLIONS of years made a fossil fuel."],
+        ["burn", "fuel", "air", "M338 292 C374 230 370 70 268 36", "combustion", 336, 250, "end", 0, "Burning the fossil fuel releases carbon that was locked away for millions of years."],
+      ];
       let at = "air", anim = null, loops = 0, years = 0;
-      const r = shell(`<svg viewBox="0 0 400 300" role="img" aria-label="The carbon cycle with one carbon atom to move">
-          <rect x="0" y="232" width="400" height="68" fill="#8a6a4a" opacity=".35"/>
-          ${Object.entries(STORES).map(([k, [x, y, n]]) => `<g><rect x="${x - 58}" y="${y - 16}" width="116" height="32" rx="16" fill="#fff" stroke="#c9d2db" stroke-width="2" id="st-${k}"/>
-            <text x="${x}" y="${y + 5}" text-anchor="middle" font-size="12" fill="#34495e">${n}</text></g>`).join("")}
-          <circle id="atom" r="11" fill="#34495e" stroke="#fff" stroke-width="3"/><text id="atomC" font-size="11" fill="#fff" text-anchor="middle">C</text>
+      const r = shell(`<svg class="scene" viewBox="0 0 384 330" id="csvg" role="img" aria-label="The carbon cycle: stores joined by labelled arrows, with one carbon atom to move">
+          <defs>${["off", "on"].map(k => `<marker id="ah-${k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="${k === "on" ? "#2f6f9f" : "#b9c4cf"}"/></marker>`).join("")}</defs>
+          <rect x="0" y="268" width="384" height="62" fill="#b08a6a" opacity=".25"/><text x="8" y="286" font-size="13" class="lbl">underground</text>
+          <g transform="translate(18 0)"><g id="arrows"></g><path id="trk" d="" fill="none" stroke="none"/>
+          ${Object.entries(STORES).map(([k, [x, y, w, n]]) => `<rect x="${x - w / 2}" y="${y - 17}" width="${w}" height="34" rx="17" class="bgc" stroke="#c9d2db" stroke-width="2.5" id="st-${k}"/>
+            <text x="${x}" y="${y + 5}" text-anchor="middle" font-size="14" font-weight="600">${n}</text>`).join("")}
+          <g id="atom"><circle r="11" fill="#34495e" stroke="#fff" stroke-width="3"/><text y="4" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">C</text></g></g>
         </svg>
         <div class="ctrl" id="moves"></div>
-        <div class="readout"><span class="chip" id="yrs">time: 0 years</span><span class="chip" id="lp">back to the air: 0 times</span></div>
-        <p class="muted" id="msg">You are one carbon atom in the air. Where next?</p>`);
-      function buttons() {
-        el("moves").innerHTML = MOVES[at].map(([k, n], i) => `<button data-mv="${i}">${n} →</button>`).join("");
-        root.querySelectorAll("[data-mv]").forEach(b => b.onclick = () => go(MOVES[at][+b.dataset.mv]));
+        <div class="readout"><span class="chip" id="yrs"></span><span class="chip" id="lp"></span></div>
+        <p class="muted" id="msg">You are one carbon atom in the air. Tap a blue arrow (or a button) to move.</p>`);
+      function drawArrows() {
+        el("arrows").innerHTML = ARROWS.map(([k, from, , d, label, lx, ly, anc, rot], i) => {
+          const live = from === at && !anim;
+          return `<g data-ar="${i}" style="${live ? "cursor:pointer" : ""}"><path d="${d}" fill="none" stroke="transparent" stroke-width="16"/>
+            <path d="${d}" fill="none" stroke="${live ? "#2f6f9f" : "#b9c4cf"}" stroke-width="${live ? 4 : 2.5}" marker-end="url(#ah-${live ? "on" : "off"})"/>
+            <text x="${lx}" y="${ly}" text-anchor="${anc}" font-size="14" ${live ? 'fill="#2f6f9f" font-weight="bold"' : 'class="lbl"'}${rot ? ` transform="rotate(${rot} ${lx} ${ly})"` : ""}>${label}</text></g>`;
+        }).join("");
+        root.querySelectorAll("[data-ar]").forEach(g => g.onclick = () => { const a = ARROWS[+g.dataset.ar]; if (a[1] === at && !anim) go(a); });
+        el("moves").innerHTML = ARROWS.filter(a => a[1] === at).map(a => `<button data-mv="${a[0]}">${a[4][0].toUpperCase() + a[4].slice(1)} →</button>`).join("");
+        root.querySelectorAll("[data-mv]").forEach(b => b.onclick = () => { if (!anim) go(ARROWS.find(a => a[0] === b.dataset.mv)); });
         Object.keys(STORES).forEach(k => el("st-" + k).setAttribute("stroke", k === at ? "#2f6f9f" : "#c9d2db"));
       }
-      function go([k, , to, text]) {
-        if (anim) return;
-        anim = { from: STORES[at], to: STORES[to], t: 0 };
-        years += k === "fossil" ? 100e6 : k === "burn" && at === "fuel" ? 0 : 1;
+      function go(a) {
+        const [k, , to] = a, text = a[9];
+        const path = el("trk"); path.setAttribute("d", a[3]);   // a steady copy: the arrows redraw under it
+        anim = { path, len: path.getTotalLength(), t: 0 };
+        years += k === "fossil" ? 100e6 : 1;
         at = to;
-        if (["photo", "feed", "decomp", "fossil", "burn"].includes(k)) api.found(k);
+        const disc = { photo: "photo", feed: "feed", decomp: "decomp", fossil: "fossil", burn: "burn" }[k];
+        if (disc) api.found(disc);
         if (to === "air") { loops++; if (loops >= 5) api.found("loop"); }
-        say(text); buttons();
+        say(text); drawArrows();
       }
       (function loop() {
         if (!alive(r)) return;
         let x, y;
         if (anim) {
-          anim.t = Math.min(1, anim.t + 0.03);
-          const e = anim.t * anim.t * (3 - 2 * anim.t);
-          x = anim.from[0] + (anim.to[0] - anim.from[0]) * e; y = anim.from[1] + (anim.to[1] - anim.from[1]) * e - Math.sin(anim.t * Math.PI) * 30;
-          if (anim.t >= 1) anim = null;
-        } else { x = STORES[at][0] + 44; y = STORES[at][1] - 14; }
-        el("atom").setAttribute("cx", x); el("atom").setAttribute("cy", y);
-        el("atomC").setAttribute("x", x); el("atomC").setAttribute("y", y + 4);
-        el("yrs").textContent = "time: " + (years >= 1e6 ? `about ${Math.round(years / 1e6)} million years` : `${years} year${years === 1 ? "" : "s"}`);
+          anim.t = Math.min(1, anim.t + 0.025);
+          const p = anim.path.getPointAtLength(anim.len * anim.t * anim.t * (3 - 2 * anim.t)); x = p.x; y = p.y;
+          if (anim.t >= 1) { anim = null; drawArrows(); }
+        } else { const [sx, sy, w] = STORES[at]; x = sx + w / 2 - 4; y = sy - 16; }
+        el("atom").setAttribute("transform", `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
+        el("yrs").textContent = "time taken: " + (years >= 1e6 ? `about ${Math.round(years / 1e6)} million years` : years ? `about ${years} year${years === 1 ? "" : "s"}` : "none yet");
         el("lp").textContent = `back to the air: ${loops} time${loops === 1 ? "" : "s"}`;
         requestAnimationFrame(loop);
       })();
-      buttons();
+      drawArrows();
     }
 
     // ── the planet ─────────────────────────────────────────────────────────
@@ -2172,21 +2379,24 @@ ARCADE.toy({
     // back, and the temperature follows the carbon dioxide. Sea level follows the temperature.
     function planetBench() {
       let fuel = 3, forest = 6, co2 = 280, peak = 280, dust = 0, hit = 0;
-      const r = shell(`<svg viewBox="0 0 400 220" role="img" aria-label="A coast with houses, ice and forest, and a thermometer">
-          <rect id="sky" x="0" y="0" width="400" height="220" fill="#cfe7fb"/><circle id="sun" cx="340" cy="36" r="20" fill="#f2b705"/>
-          <rect id="sea" x="0" y="150" width="150" height="70" fill="#4a90d9" opacity=".75"/>
+      const r = shell(`<svg class="scene" viewBox="0 0 360 230" role="img" aria-label="A coast with ice, sea, houses, a factory and forest, and a thermometer">
+          <rect id="sky" x="0" y="0" width="360" height="230" fill="#cfe7fb"/><circle id="sun" cx="300" cy="36" r="20" fill="#f2b705"/>
+          <rect id="sea" x="0" y="150" width="140" height="80" fill="#4a90d9" opacity=".8"/>
           <path id="ice" d="" fill="#fff" stroke="#b9d3e8"/>
-          <path d="M150 150 L400 150 L400 220 L150 220 Z" fill="#9bc37a"/><g id="trees"></g>
-          <text x="210" y="148" font-size="22">🏠</text><text x="250" y="148" font-size="22">🏠</text><text x="300" y="148" font-size="22">🏭</text>
-          <rect id="flood" x="150" y="150" width="250" height="0" fill="#4a90d9" opacity=".75"/>
+          <path d="M140 150 L330 150 L330 230 L140 230 Z" fill="#9bc37a"/><g id="trees"></g>
+          <text x="176" y="148" font-size="22">🏠</text><text x="210" y="148" font-size="22">🏠</text><text x="270" y="148" font-size="22">🏭</text>
+          <rect id="flood" x="140" y="150" width="190" height="0" fill="#4a90d9" opacity=".8"/>
           <g id="smoke"></g><g id="rock"></g>
-          <rect x="376" y="60" width="12" height="120" rx="6" fill="#fff" stroke="#7f8c99"/><rect id="therm" x="378" y="120" width="8" height="58" fill="#c0392b"/>
-          <text x="200" y="210" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold" id="tt"></text>
+          <rect x="338" y="40" width="14" height="150" rx="7" fill="#fff" stroke="#7f8c99"/><circle cx="345" cy="196" r="11" fill="#c0392b"/><rect id="therm" x="341" y="120" width="8" height="70" fill="#c0392b"/>
+          <text x="345" y="30" text-anchor="middle" font-size="12" class="lbl">°C</text>
+          <text x="40" y="186" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">sea</text>
+          <text x="12" y="92" font-size="13" class="lbl" id="iceL">ice cap</text>
+          <text x="180" y="222" text-anchor="middle" font-size="14" fill="#fff" font-weight="bold" id="tt"></text>
         </svg>
-        <div class="ctrl slider"><label for="fu">Fossil fuel burned</label><input type="range" id="fu" min="0" max="10" value="3"></div>
-        <div class="ctrl slider"><label for="fo">Forests</label><input type="range" id="fo" min="0" max="10" value="6"></div>
         <div class="readout"><span class="chip" id="c2"></span><span class="chip" id="tp"></span><span class="chip" id="sl"></span></div>
-        <div class="ctrl"><button id="ast">☄️ 66 million years ago…</button><button id="rs">↺ Start again</button></div>
+        <div class="ctrl slider"><label for="fu">🏭 Fossil fuel burned</label><input type="range" id="fu" min="0" max="10" value="3"></div>
+        <div class="ctrl slider"><label for="fo">🌲 Forests</label><input type="range" id="fo" min="0" max="10" value="6"></div>
+        <div class="ctrl"><button id="ast">☄️ Go back 66 million years…</button><button id="rs">↺ Start again</button></div>
         <p class="muted" id="msg">Carbon dioxide traps heat. Burn more, or plant more, and watch.</p>`);
       el("fu").oninput = () => { fuel = +el("fu").value; };
       el("fo").oninput = () => { forest = +el("fo").value; };
@@ -2204,16 +2414,18 @@ ARCADE.toy({
         if (temp >= 16) api.found("warm");
         if (hit) { hit += 0.004; dust = Math.max(0, 1 - (hit - 1) * 0.35); }
         const rise = Math.max(-10, Math.min(40, (temp - 14) * 9));
-        el("sea").setAttribute("y", 150 - rise); el("sea").setAttribute("height", 70 + rise);
-        el("flood").setAttribute("y", 150 - Math.max(0, rise)); el("flood").setAttribute("height", Math.max(0, rise));
-        const iceW = Math.max(0, Math.min(150, 80 - (temp - 14) * 30));
-        el("ice").setAttribute("d", `M0 150 L${iceW} 150 L${iceW * 0.7} 110 L0 100 Z`);
-        el("trees").innerHTML = Array.from({ length: forest }, (_, i) => `<text x="${160 + i * 20}" y="${170 + (i % 2) * 14}" font-size="16"${dust > 0.3 ? ' opacity=".35"' : ""}>🌲</text>`).join("");
-        el("smoke").innerHTML = Array.from({ length: fuel }, (_, i) => `<circle cx="${310 + Math.sin(i * 1.7 + performance.now() / 700) * 8}" cy="${120 - i * 10}" r="${5 + i}" fill="#7f8c99" opacity=".35"/>`).join("");
+        el("sea").setAttribute("y", (150 - rise).toFixed(1)); el("sea").setAttribute("height", (80 + rise).toFixed(1));
+        el("flood").setAttribute("y", (150 - Math.max(0, rise)).toFixed(1)); el("flood").setAttribute("height", Math.max(0, rise).toFixed(1));
+        const iceW = Math.max(0, Math.min(130, 80 - (temp - 14) * 30));
+        el("ice").setAttribute("d", `M0 ${(150 - rise).toFixed(1)} L${iceW.toFixed(1)} ${(150 - rise).toFixed(1)} L${(iceW * 0.7).toFixed(1)} 110 L0 100 Z`);
+        el("iceL").style.display = iceW > 20 ? "" : "none";
+        el("trees").innerHTML = Array.from({ length: forest }, (_, i) => `<text x="${146 + i * 18}" y="${176 + (i % 2) * 16}" font-size="16"${dust > 0.3 ? ' opacity=".35"' : ""}>🌲</text>`).join("");
+        el("smoke").innerHTML = Array.from({ length: fuel }, (_, i) => `<circle cx="${(282 + Math.sin(i * 1.7 + performance.now() / 700) * 8).toFixed(1)}" cy="${120 - i * 10}" r="${5 + i}" fill="#7f8c99" opacity=".35"/>`).join("");
         el("sky").setAttribute("fill", dust > 0.05 ? `rgb(${Math.round(207 - 140 * dust)},${Math.round(231 - 150 * dust)},${Math.round(251 - 170 * dust)})` : "#cfe7fb");
-        el("sun").setAttribute("opacity", 1 - dust * 0.85);
-        el("rock").innerHTML = hit && hit < 1.2 ? `<text x="${60 + (hit - 1) * 700}" y="${(hit - 1) * 700}" font-size="26">☄️</text>` : dust > 0.3 ? `<text x="170" y="120" font-size="28">🦕</text>` : "";
-        el("therm").setAttribute("y", 178 - Math.max(4, Math.min(116, (temp - 4) * 5.8))); el("therm").setAttribute("height", Math.max(4, Math.min(116, (temp - 4) * 5.8)));
+        el("sun").setAttribute("opacity", (1 - dust * 0.85).toFixed(2));
+        el("rock").innerHTML = hit && hit < 1.2 ? `<text x="${(40 + (hit - 1) * 700).toFixed(1)}" y="${(20 + (hit - 1) * 600).toFixed(1)}" font-size="26">☄️</text>` : dust > 0.3 ? `<text x="200" y="196" font-size="28">🦕</text>` : "";
+        const th = Math.max(4, Math.min(146, (temp - 4) * 7));
+        el("therm").setAttribute("y", (190 - th).toFixed(1)); el("therm").setAttribute("height", th.toFixed(1));
         el("c2").textContent = `carbon dioxide ${Math.round(co2)} ppm`;
         el("tp").textContent = `mean temperature ${temp.toFixed(1)} °C`;
         el("sl").textContent = rise > 20 ? "sea level: flooding!" : rise > 5 ? "sea level rising" : rise < -3 ? "sea level falling" : "sea level steady";
