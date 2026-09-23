@@ -829,7 +829,7 @@ window.ARCADE = {
 // Breathing Machine — Grade 7 Unit 1 (Respiration).
 //
 // Four benches behind one set of tabs: the bell-jar model you pull, a runner whose oxygen you have
-// to keep up, one air sac you swap gases across by hand, and the limewater test. Nothing here can
+// to keep up, one air sac where gases drift across on their own, and the limewater test. Nothing here can
 // be answered wrongly; the runner passing out is a discovery, not a fail.
 ARCADE.toy({
   id: "g07-u01-breathing", unit: "g07-u01", order: 1,
@@ -843,9 +843,11 @@ ARCADE.toy({
     ["keepup", "Kept the sprinter going", "Breathe fast enough for a sprint"],
     ["faint", "Out of puff", "Let the oxygen run all the way out"],
     ["over", "Too much of a good thing", "Breathe far too fast while resting"],
-    ["o2", "Oxygen crossed over", "Move oxygen from the air sac into the blood"],
-    ["co2", "Carbon dioxide came back", "Move carbon dioxide out of the blood"],
-    ["swap20", "Busy little air sac", "Swap twenty gases in the air sac"],
+    ["o2", "Oxygen crossed over", "Watch oxygen drift from the air sac into the blood"],
+    ["co2", "Carbon dioxide came back", "Watch carbon dioxide drift out of the blood"],
+    ["swap20", "Busy little air sac", "Watch twenty gases cross the thin wall"],
+    ["steep", "Fed the body", "Keep breathing and the blood moving until 30 oxygen reach the body"],
+    ["even", "It all evened out", "Stop the blood, stop breathing, and wait"],
     ["cloudy", "Cloudy limewater", "Breathe out into the limewater"],
     ["clear", "Room air is different", "Pump ordinary air through the other tube"],
   ],
@@ -963,55 +965,84 @@ ARCADE.toy({
     }
 
     // ── one air sac ─────────────────────────────────────────────────────────
+    // Diffusion, not delivery: nobody carries a gas across. Every dot wanders at random, and some
+    // wander through the thin wall. Because the air sac is crowded with oxygen and the blood is not,
+    // more oxygen wanders down than up — the student only controls what keeps that difference going
+    // (breathing and blood flow). Stop both and the two sides even out, which is the lesson.
     function sacBench() {
-      let swaps = 0;
-      const cells = [0, 1, 2, 3].map(i => ({ x: 120 + i * 68, red: false }));
-      const o2s = [0, 1, 2].map(i => ({ x: 120 + i * 70, y: 70, held: false }));
-      const co2s = [];
-      shell(`<p class="muted">The air sac is at the top, the blood vessel underneath. Drag a red oxygen dot down into the blood — then drag the grey carbon dioxide back up into the air.</p>
-        <svg viewBox="0 0 400 230" id="sac" role="img" aria-label="An air sac and a blood vessel">
-          <path d="M40 20 Q200 -10 360 20 L360 110 Q200 130 40 110 Z" fill="#dff0fb" stroke="#9fc6e0" stroke-width="3"/>
-          <text x="200" y="40" text-anchor="middle" font-size="14" fill="#5b6675">inside the air sac</text>
-          <rect x="30" y="140" width="340" height="56" rx="28" fill="#fbe3e6" stroke="#e0a6ad" stroke-width="3"/>
-          <text x="200" y="216" text-anchor="middle" font-size="14" fill="#5b6675">blood vessel — blue cells need oxygen</text>
-          <g id="cells"></g><g id="gases"></g>
-        </svg><div class="ctrl"><span class="chip" id="sw">0 gases swapped</span><button id="more">Send more blood 🩸</button></div>`);
-      const svg = document.getElementById("sac"), el = id => document.getElementById(id);
-      function render() {
-        el("cells").innerHTML = cells.map((c, i) => `<circle cx="${c.x}" cy="168" r="17" fill="${c.red ? "#e8555f" : "#6a8fd0"}" stroke="#fff" stroke-width="2"/>`).join("");
-        el("gases").innerHTML = o2s.map((g, i) => `<g data-g="o2:${i}" class="grab"><circle cx="${g.x}" cy="${g.y}" r="14" fill="#e8555f" opacity=".92"/><text x="${g.x}" y="${g.y + 5}" text-anchor="middle" font-size="12" fill="#fff">O₂</text></g>`).join("")
-          + co2s.map((g, i) => `<g data-g="co2:${i}" class="grab"><circle cx="${g.x}" cy="${g.y}" r="14" fill="#8d97a3" opacity=".92"/><text x="${g.x}" y="${g.y + 4}" text-anchor="middle" font-size="10" fill="#fff">CO₂</text></g>`).join("");
-        bind();
+      const X0 = 44, X1 = 356, SAC = [24, 106], BLOOD = [154, 236], CROSS = 0.6;
+      let parts = [], flowing = true, crossed = 0, carried = 0, lastAct = performance.now(), last = performance.now(), spawn = 0;
+      const dot = (kind, side) => { const [a, b] = side === "sac" ? SAC : BLOOD;
+        return { kind, side, x: X0 + Math.random() * (X1 - X0), y: a + Math.random() * (b - a), h: Math.random() * 6.3 }; };
+      for (let i = 0; i < 20; i++) parts.push(dot("o2", "sac"));
+      for (let i = 0; i < 16; i++) parts.push(dot("co2", "blood"));
+      shell(`<p class="muted">Oxygen (red) and carbon dioxide (grey) wander about on their own. Watch which way more of them drift through the thin wall. You are in charge of breathing and the blood.</p>
+        <svg viewBox="0 0 400 262" id="sac" role="img" aria-label="An air sac above a blood vessel, with gas particles moving between them">
+          <rect x="36" y="16" width="328" height="98" rx="20" fill="#dff0fb" stroke="#9fc6e0" stroke-width="3"/>
+          <text x="200" y="14" text-anchor="middle" font-size="13" fill="#5b6675">inside the air sac</text>
+          <rect x="36" y="146" width="328" height="98" rx="20" fill="#fbe3e6" stroke="#e0a6ad" stroke-width="3"/>
+          <text x="200" y="258" text-anchor="middle" font-size="13" fill="#5b6675" id="bloodlab">blood vessel — blood flowing →</text>
+          <text x="200" y="134" text-anchor="middle" font-size="12" fill="#9aa6b3">thin wall — one cell thick</text>
+          <g id="gases"></g>
+        </svg>
+        <div class="readout"><span class="chip" id="cs">air sac: 20 O₂ · 0 CO₂</span><span class="chip" id="cb">blood: 0 O₂ · 16 CO₂</span><span class="chip" id="cd">oxygen sent to the body: 0</span></div>
+        <div class="ctrl"><button id="breathe">😮‍💨 Breathe (fresh air in, old air out)</button><button id="flow" class="on">🩸 Blood flowing</button></div>
+        <p class="muted" id="sacmsg"></p>`);
+      const el = id => document.getElementById(id);
+      const msg = m => { if (el("sacmsg").textContent !== m) { el("sacmsg").textContent = m; api.say(m); } };
+      el("breathe").onclick = () => {
+        lastAct = performance.now();
+        const out = parts.filter(p => p.side === "sac" && p.kind === "co2").length;
+        parts = parts.filter(p => !(p.side === "sac" && p.kind === "co2"));
+        const have = parts.filter(p => p.side === "sac" && p.kind === "o2").length;
+        for (let i = have; i < 20; i++) parts.push(dot("o2", "sac"));
+        msg(out ? `You breathed out ${out} carbon dioxide and breathed in fresh oxygen.` : "Fresh oxygen in. Nothing much to breathe out yet.");
+      };
+      el("flow").onclick = () => {
+        flowing = !flowing; lastAct = performance.now();
+        el("flow").classList.toggle("on", flowing);
+        el("flow").textContent = flowing ? "🩸 Blood flowing" : "✋ Blood stopped";
+        el("bloodlab").textContent = flowing ? "blood vessel — blood flowing →" : "blood vessel — blood stopped";
+      };
+      (function loop(now) {
+        if (!alive() || tab !== "sac") return;
+        const dt = Math.min(0.05, (now - last) / 1000); last = now;
+        const calm = api.calm(), speed = calm ? 45 : 90;
+        for (const p of parts) {
+          p.h += (Math.random() - 0.5) * 2.4;
+          p.x += Math.cos(p.h) * speed * dt; p.y += Math.sin(p.h) * speed * dt;
+          if (p.side === "blood" && flowing) p.x += 34 * dt;
+          if (p.x < X0) { p.x = X0; p.h = Math.PI - p.h; }
+          if (p.x > X1) { if (p.side === "blood" && flowing) { p.gone = true; if (p.kind === "o2") carried++; continue; } p.x = X1; p.h = Math.PI - p.h; }
+          const [a, b] = p.side === "sac" ? SAC : BLOOD;
+          if (p.y < a) {
+            if (p.side === "blood" && Math.random() < CROSS) { p.side = "sac"; p.y = SAC[1]; cross(p); } else { p.y = a; p.h = -p.h; }
+          } else if (p.y > b) {
+            if (p.side === "sac" && Math.random() < CROSS) { p.side = "blood"; p.y = BLOOD[0]; cross(p); } else { p.y = b; p.h = -p.h; }
+          }
+        }
+        parts = parts.filter(p => !p.gone);
+        // Blood arriving from the body brings carbon dioxide with it, and no oxygen.
+        if (flowing) { spawn += dt * 1.6; while (spawn >= 1) { spawn--; const d = dot("co2", "blood"); d.x = X0; parts.push(d); } }
+        const n = (side, kind) => parts.filter(p => p.side === side && p.kind === kind).length;
+        const so = n("sac", "o2"), sc = n("sac", "co2"), bo = n("blood", "o2"), bc = n("blood", "co2");
+        el("cs").textContent = `air sac: ${so} O₂ · ${sc} CO₂`;
+        el("cb").textContent = `blood: ${bo} O₂ · ${bc} CO₂`;
+        el("cd").textContent = `oxygen sent to the body: ${carried}`;
+        if (carried >= 30) api.found("steep");
+        if (!flowing && now - lastAct > 8000 && so + bo >= 6 && Math.abs(so - bo) <= 2 && api.found("even"))
+          msg("Both sides have about the same now, so as many drift up as drift down. Breathe and get the blood moving again to bring the difference back.");
+        el("gases").innerHTML = parts.map(p => p.kind === "o2"
+          ? `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="7" fill="#e8555f"/>`
+          : `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="7" fill="#8d97a3"/>`).join("");
+        requestAnimationFrame(loop);
+      })(last);
+      function cross(p) {
+        crossed++;
+        if (p.kind === "o2" && p.side === "blood" && api.found("o2")) msg("Nobody pushed it — oxygen drifts from where there is lots of it to where there is little.");
+        if (p.kind === "co2" && p.side === "sac" && api.found("co2")) msg("Carbon dioxide drifts the other way, because the blood has more of it than the air.");
+        if (crossed >= 20) api.found("swap20");
       }
-      const at = e => { const r = svg.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * 400, y: (e.clientY - r.top) / r.height * 230 }; };
-      function bind() {
-        svg.querySelectorAll("[data-g]").forEach(g => g.addEventListener("pointerdown", e => {
-          e.preventDefault();
-          const [kind, i] = g.dataset.g.split(":"), list = kind === "o2" ? o2s : co2s, dot = list[+i];
-          if (!dot) return;
-          g.setPointerCapture(e.pointerId);
-          const move = ev => { const p = at(ev); dot.x = p.x; dot.y = p.y; g.querySelectorAll("circle,text").forEach(n => { n.setAttribute(n.tagName === "text" ? "x" : "cx", p.x); n.setAttribute(n.tagName === "text" ? "y" : "cy", p.y + (n.tagName === "text" ? 5 : 0)); }); };
-          const up = ev => {
-            g.removeEventListener("pointermove", move); removeEventListener("pointerup", up);
-            const p = at(ev);
-            if (kind === "o2" && p.y > 132) {
-              const c = cells.filter(c => !c.red).sort((a, b) => Math.abs(a.x - p.x) - Math.abs(b.x - p.x))[0];
-              if (c) { c.red = true; o2s.splice(+i, 1); co2s.push({ x: c.x, y: 150 }); scored("o2"); return; }
-            }
-            if (kind === "co2" && p.y < 132) { co2s.splice(+i, 1); scored("co2"); return; }
-            render();
-          };
-          g.addEventListener("pointermove", move); addEventListener("pointerup", up);
-        }));
-      }
-      function scored(which) {
-        swaps++; el("sw").textContent = swaps + " gases swapped"; api.beep(true); api.found(which);
-        if (swaps >= 20) api.found("swap20");
-        if (o2s.length < 3) o2s.push({ x: 90 + api.rnd(220), y: 60 + api.rnd(30) });
-        render();
-      }
-      el("more").onclick = () => { cells.forEach(c => c.red = false); co2s.length = 0; render(); };
-      render();
     }
 
     // ── limewater ───────────────────────────────────────────────────────────
@@ -1218,7 +1249,7 @@ ARCADE.toy({
     ["run", "First chromatogram", "Dip the paper and let the solvent climb"],
     ["split", "One ink, three colours", "Separate an ink that is a mixture"],
     ["washed", "Oops — it washed away", "Start the ink below the solvent"],
-    ["rf", "Measured an Rf", "Tap a colour and work out how far it went"],
+    ["rf", "Measured an Rf", "Tap a colour, then measure it and the solvent front with the ruler"],
     ["all4", "Fair test", "Run all four suspects at once"],
     ["pure", "A pure ink", "Find the pen whose ink is only one colour"],
     ["solved", "Case closed", "Name the pen that wrote the note"],
@@ -1235,6 +1266,9 @@ ARCADE.toy({
     const ALL = [NOTEPEN].concat(PENS);
 
     let picked = "note", spots = [], front = 0, running = false, dipped = false, ruler = false, sunk = false, said = "";
+    // Measuring: tap a colour, drag the marker to its middle, then to the solvent front. The student
+    // reads the ruler; close enough (4 mm) snaps, so it can be fiddly but never wrong.
+    let meas = null, markY = null, dragging = false;
     root.innerHTML = `
       <p class="muted" id="story">Somebody ate the last biscuit and left this note. Pick a pen, tap the paper to dot it on the pencil line, then dip.</p>
       <svg viewBox="0 0 400 300" id="lab" role="img" aria-label="Chromatography paper standing in a beaker of solvent">
@@ -1247,7 +1281,7 @@ ARCADE.toy({
         <path d="M76 232 L76 288 L324 288 L324 232" fill="none" stroke="#7f8c99" stroke-width="4"/>
         <rect id="solvent" x="78" y="248" width="244" height="38" fill="#dbeaf6" opacity=".85"/>
         <text x="200" y="274" text-anchor="middle" font-size="13" fill="#5b6675">solvent</text>
-        <g id="spots"></g><g id="rulermarks"></g>
+        <g id="spots"></g><g id="rulermarks"></g><g id="marker"></g>
       </svg>
       <div class="ctrl" id="pens">${ALL.map(p => `<button data-pen="${p.key}" class="${p.key === "note" ? "on" : ""}">
         <span style="display:inline-block;width:.8em;height:.8em;border-radius:50%;background:${p.ink};margin-right:6px"></span>${p.name}</button>`).join("")}</div>
@@ -1271,9 +1305,30 @@ ARCADE.toy({
       api.log("spot", { pen: pen.key });
       render(); say(`${pen.name} dotted on the line. Add more, or dip.`);
     });
+    const yIn = e => { const r = svg.getBoundingClientRect(); return (e.clientY - r.top) / r.height * 300; };
+    svg.addEventListener("pointermove", e => {
+      if (!dragging) return;
+      const base = sunk ? START + 50 : START;
+      markY = Math.max(base - RUN - 2, Math.min(base, yIn(e))); render();
+    });
+    addEventListener("pointerup", () => {
+      if (!dragging || !meas) return;
+      dragging = false;
+      const base = sunk ? START + 50 : START, at = Math.round((base - markY) / RUN * 160);
+      const want = meas.got === null ? meas.spot : meas.front;
+      if (Math.abs(at - want) > 4) {
+        said = ""; say(meas.got === null ? `The marker reads ${at} mm. Line it up with the middle of the colour.` : `The marker reads ${at} mm. Take it up to the dashed solvent front.`);
+        return;
+      }
+      markY = base - RUN * want / 160; render();
+      if (meas.got === null) { meas.got = want; said = ""; say(`The colour travelled ${want} mm. Now drag the marker up to the solvent front.`); return; }
+      api.found("rf"); api.log("rf", { spot: meas.got, front: want });
+      said = ""; say(`The solvent went ${want} mm. Rf = ${meas.got} ÷ ${want} = ${(meas.got / want).toFixed(2)}. Tap another colour to measure it.`);
+      meas = null; markY = null;
+    });
     el("low").onclick = () => { sunk = !sunk; el("low").classList.toggle("on", sunk); el("paper").setAttribute("y", sunk ? 76 : 26); el("paper").setAttribute("height", sunk ? 210 : 260); render(); say(sunk ? "The pencil line is under the solvent now. Dip it and see." : "Back above the solvent."); };
     el("rule").onclick = () => { ruler = !ruler; el("rule").textContent = ruler ? "📏 Ruler on" : "📏 Ruler off"; el("rule").classList.toggle("on", ruler); render(); };
-    el("reset").onclick = () => { spots = []; front = 0; dipped = false; running = false; el("accuse").hidden = true; el("front").setAttribute("opacity", 0); render(); say("Fresh paper."); };
+    el("reset").onclick = () => { meas = null; markY = null; spots = []; front = 0; dipped = false; running = false; el("accuse").hidden = true; el("front").setAttribute("opacity", 0); render(); say("Fresh paper."); };
     el("dip").onclick = () => {
       if (running || !spots.length) { say("Dot at least one pen on the line first."); return; }
       if (sunk) { spots.forEach(s => s.gone = true); api.found("washed"); say("The ink was under the solvent, so it dissolved straight into the beaker. Nothing to see! Move the line back up."); render(); return; }
@@ -1314,16 +1369,25 @@ ARCADE.toy({
         ? `<circle cx="${s.x}" cy="${base}" r="7" fill="${s.pen.ink}"/>`
         : s.pen.dyes.map(([rf, col], j) => `<ellipse data-dye="${i}:${j}" cx="${s.x}" cy="${base - RUN * front * rf}" rx="9" ry="6" fill="${col}" opacity=".88" class="grab"/>`).join(""))).join("");
       el("wet").innerHTML = front > 0 ? `<rect x="104" y="${fy}" width="192" height="${base - fy + 10}" fill="#eaf4fb" opacity=".55"/>` : "";
-      el("rulermarks").innerHTML = ruler ? Array.from({ length: 9 }, (_, k) => {
-        const y = base - RUN * (k / 8);
-        return `<line x1="96" y1="${y}" x2="106" y2="${y}" stroke="#5b6675" stroke-width="2"/><text x="60" y="${y + 4}" font-size="11" fill="#5b6675">${(k * 20)} mm</text>`;
-      }).join("") : "";
+      el("rulermarks").innerHTML = ruler ? `<rect x="84" y="${base - RUN - 4}" width="20" height="${RUN + 8}" fill="#fff8dc" stroke="#c9b458"/>` + Array.from({ length: 17 }, (_, k) => {
+        const y = base - RUN * (k / 16), big = k % 2 === 0;
+        return `<line x1="${big ? 88 : 96}" y1="${y}" x2="104" y2="${y}" stroke="#5b6675" stroke-width="${big ? 2 : 1}"/>` + (big ? `<text x="80" y="${y + 4}" text-anchor="end" font-size="11" fill="#5b6675">${k * 10}</text>` : "");
+      }).join("") + `<text x="80" y="${base - RUN - 10}" text-anchor="end" font-size="11" fill="#5b6675">mm</text>` : "";
+      const mm = y => Math.round((base - y) / RUN * 160);
+      el("marker").innerHTML = ruler && meas && markY !== null
+        ? `<line x1="84" y1="${markY}" x2="296" y2="${markY}" stroke="#b4531f" stroke-width="2" stroke-dasharray="4 3"/>
+           <g class="grab" id="mk"><rect x="48" y="${markY - 14}" width="40" height="28" rx="8" fill="#b4531f"/><text x="68" y="${markY + 5}" text-anchor="middle" font-size="12" fill="#fff">${mm(markY)}</text></g>`
+        : "";
+      const mk = document.getElementById("mk");
+      if (mk) mk.addEventListener("pointerdown", e => { e.preventDefault(); e.stopPropagation(); dragging = true; mk.setPointerCapture(e.pointerId); });
       svg.querySelectorAll("[data-dye]").forEach(d => d.onclick = ev => {
         ev.stopPropagation();
+        if (running) return;
         const [i, j] = d.dataset.dye.split(":").map(Number), [rf] = spots[i].pen.dyes[j];
-        const dist = Math.round(RUN * front * rf / RUN * 160), fd = Math.round(front * 160);
-        api.found("rf");
-        said = ""; say(`That colour travelled ${dist} mm. The solvent went ${fd} mm. Rf = ${dist} ÷ ${fd} = ${(dist / fd).toFixed(2)}`);
+        meas = { spot: Math.round(front * rf * 160), front: Math.round(front * 160), got: null };
+        ruler = true; el("rule").textContent = "📏 Ruler on"; el("rule").classList.add("on");
+        markY = base - 8; render();
+        said = ""; say("Drag the orange marker up the ruler until it sits in the middle of that colour, then let go.");
       });
     }
     render();
