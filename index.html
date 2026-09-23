@@ -826,6 +826,438 @@ window.ARCADE = {
   document.head.appendChild(s);
 })();
 
+// Cell Lab — Grade 6 Unit 1 (Cells).
+//
+// Four benches behind one set of tabs: a microscope you focus (and can crash into the slide), a
+// cell you build by dragging parts in and out, a job centre where five specialised cells either
+// manage their job or do not, and a zoom-out from one cell to a whole organism. Nothing is marked
+// wrong: taking the membrane away so the cytoplasm leaks out is a discovery, not a fail.
+ARCADE.toy({
+  id: "g06-u01-cells", unit: "g06-u01", order: 1,
+  name: "Cell Lab", icon: "🔬",
+  blurb: "Build a cell, break a cell, and give cells a job",
+  discoveries: [
+    ["focus", "Sharp!", "Focus the microscope on some cells"],
+    ["crunch", "Crunch!", "Lower the lens until it hits the slide"],
+    ["stain", "Now you can see it", "Stain the cells so the nucleus shows up"],
+    ["x40", "Up close", "Get a sharp picture with the ×40 lens"],
+    ["cheek", "Your own cells", "Look at stained cheek cells"],
+    ["animal", "An animal cell", "Build a cell with just the four parts every cell needs"],
+    ["plant", "A plant cell", "Build a cell with all seven parts"],
+    ["root", "Still a plant", "Build a plant cell that could live underground"],
+    ["spill", "Leaky!", "Take the membrane away and watch the cytoplasm"],
+    ["power", "Power cut", "Take the mitochondria out of a working cell"],
+    ["shape", "Stiff at last", "Give a floppy cell a cell wall"],
+    ["jobs", "Every part has a job", "Put all seven parts in, one at a time"],
+    ["rbc", "Room for more oxygen", "Take the nucleus out of a red blood cell"],
+    ["stuck", "Traffic jam", "Make a red blood cell too big for the capillary"],
+    ["sheath", "Faster message", "Send a signal down a neurone with a fatty sheath"],
+    ["sweep", "Mucus swept away", "Give a ciliated cell enough energy to sweep the mucus up"],
+    ["hair", "Big drink", "Grow a root hair long enough to fill the glass"],
+    ["palisade", "Sugar factory", "Make the palisade cell catch the most light"],
+    ["human", "Cell to human", "Zoom out from one cell to a whole person"],
+    ["tree", "Cell to plant", "Zoom out from one leaf cell to a whole plant"],
+  ],
+  mount(root, api) {
+    let tab = "scope", run = 0;
+    const alive = r => r === run && document.body.contains(root);
+    const tabs = [["scope", "🔬 Microscope"], ["build", "🧱 Build a cell"], ["jobs", "🛠️ Job centre"], ["zoom", "🔭 Zoom out"]];
+    const el = id => document.getElementById(id);
+    const say = m => { const p = el("msg"); if (p && p.textContent !== m) { p.textContent = m; api.say(m); } };
+
+    function shell(inner) {
+      run++;
+      root.innerHTML = `<div class="ctrl">${tabs.map(([k, n]) =>
+        `<button data-tab="${k}" class="${k === tab ? "on" : ""}">${n}</button>`).join("")}</div><div id="bench">${inner}</div>`;
+      root.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { tab = b.dataset.tab; draw(); });
+      return run;
+    }
+    function draw() { ({ scope: scopeBench, build: buildBench, jobs: jobBench, zoom: zoomBench })[tab](); }
+    const pickRow = (attr, list, on) => `<div class="ctrl">${list.map(([k, n]) => `<button data-${attr}="${k}" class="${k === on ? "on" : ""}">${n}</button>`).join("")}</div>`;
+    const wirePick = (attr, fn) => root.querySelectorAll(`[data-${attr}]`).forEach(b => b.onclick = () => {
+      root.querySelectorAll(`[data-${attr}]`).forEach(x => x.classList.toggle("on", x === b)); fn(b.dataset[attr]);
+    });
+
+    // ── the microscope ──────────────────────────────────────────────────────
+    // The lens only comes sharp at one height, and the stronger the lens the closer that height is
+    // to the slide — so the ×40 picture is the one where crashing is easiest. That is the lesson.
+    function scopeBench() {
+      const SHARP = { 4: 62, 10: 40, 40: 14 };
+      let slide = "onion", mag = 4, h = 90, stained = false, cracked = false;
+      const r = shell(`${pickRow("slide", [["onion", "🧅 Onion skin"], ["cheek", "👄 Cheek cells"]], "onion")}
+        <svg viewBox="0 0 400 250" role="img" aria-label="A microscope from the side, and what you see down the eyepiece">
+          <defs><filter id="blur"><feGaussianBlur id="bl" stdDeviation="6"/></filter>
+            <clipPath id="eye"><circle cx="290" cy="118" r="98"/></clipPath></defs>
+          <text x="70" y="18" text-anchor="middle" font-size="12" fill="#5b6675">from the side</text>
+          <rect x="16" y="186" width="110" height="10" fill="#8d97a3"/>
+          <rect x="36" y="178" width="70" height="7" fill="#dbeaf6" stroke="#7f8c99" id="slideS"/>
+          <path id="crackS" d="" stroke="#b4531f" stroke-width="2" fill="none"/>
+          <g id="tube"><rect x="56" y="-80" width="30" height="110" fill="#5b6675"/><rect x="62" y="30" width="18" height="16" fill="#34495e"/>
+            <text x="71" y="42" text-anchor="middle" font-size="9" fill="#fff" id="magS">×4</text></g>
+          <text x="70" y="226" text-anchor="middle" font-size="13" fill="#5b6675" id="gap"></text>
+          <circle cx="290" cy="118" r="100" fill="#222"/>
+          <g clip-path="url(#eye)"><rect x="190" y="18" width="200" height="200" fill="#f4f1e8" id="bg"/>
+            <g id="cells" filter="url(#blur)"></g><path id="crack" d="" stroke="#333" stroke-width="3" fill="none"/></g>
+          <text x="290" y="240" text-anchor="middle" font-size="12" fill="#5b6675">down the eyepiece</text>
+        </svg>
+        ${pickRow("mag", [["4", "×4 lens"], ["10", "×10 lens"], ["40", "×40 lens"]], "4")}
+        <div class="ctrl slider"><label for="fk">Focus knob (lens up ↔ down)</label><input type="range" id="fk" min="0" max="100" value="10"><span class="chip" id="fkv"></span></div>
+        <div class="ctrl"><button id="stain">💧 Add a drop of stain</button><button id="fresh">🔄 Fresh slide</button></div>
+        <p class="muted" id="msg">Turn the focus knob to bring the lens down towards the slide until the cells look sharp.</p>`);
+
+      // Cells are drawn once per slide and lens; the blur is the only thing the knob changes.
+      function cellsSVG() {
+        const s = mag === 4 ? 0.35 : mag === 10 ? 0.8 : 2.2, cx = 290, cy = 118, out = [];
+        const nuc = stained ? (slide === "onion" ? "#8a5a12" : "#1d3f8f") : "#d8d2c2";
+        const fill = stained ? (slide === "onion" ? "#f2d58a" : "#aac4ef") : "#efeadd";
+        const edge = stained ? (slide === "onion" ? "#a07420" : "#3c62b8") : "#c9c1ad";
+        if (slide === "onion") {
+          const w = 70 * s, hh = 28 * s;
+          for (let row = -8; row <= 8; row++) for (let col = -6; col <= 6; col++) {
+            const x = cx + col * w + (row % 2 ? w / 2 : 0) - w / 2, y = cy + row * hh - hh / 2;
+            if (Math.abs(x - cx) > 130 || Math.abs(y - cy) > 130) continue;
+            out.push(`<rect x="${x}" y="${y}" width="${w}" height="${hh}" fill="${fill}" stroke="${edge}" stroke-width="${Math.max(1, 2.5 * s)}"/>`,
+              `<circle cx="${x + w * (0.3 + ((row * 7 + col * 3) & 3) * 0.12)}" cy="${y + hh / 2}" r="${5 * s}" fill="${nuc}"/>`);
+          }
+        } else {
+          const pts = [[0, 0], [-60, -40], [55, -35], [-45, 50], [60, 45], [0, -80], [5, 80], [-95, 5], [95, 0]];
+          pts.forEach(([dx, dy], i) => {
+            const x = cx + dx * s, y = cy + dy * s, R = 24 * s;
+            const d = Array.from({ length: 9 }, (_, k) => { const a = k / 9 * 6.283, rr = R * (0.8 + 0.25 * Math.sin(k * 2.3 + i)); return `${k ? "L" : "M"}${(x + rr * Math.cos(a)).toFixed(1)} ${(y + rr * Math.sin(a)).toFixed(1)}`; }).join(" ") + "Z";
+            out.push(`<path d="${d}" fill="${fill}" stroke="${edge}" stroke-width="${Math.max(1, 1.5 * s)}" stroke-linejoin="round"/>`,
+              `<circle cx="${x + 4 * s}" cy="${y - 3 * s}" r="${5 * s}" fill="${nuc}"/>`);
+          });
+        }
+        return out.join("");
+      }
+      function render() {
+        if (!el("cells")) return;
+        el("cells").innerHTML = cellsSVG();
+        const off = Math.abs(h - SHARP[mag]), blur = cracked ? 8 : Math.min(9, off / 3);
+        el("bl").setAttribute("stdDeviation", blur.toFixed(2));
+        el("tube").setAttribute("transform", `translate(0 ${-h * 1.5 + 132})`);
+        el("magS").textContent = "×" + mag;
+        el("fkv").textContent = cracked ? "💥" : blur < 0.8 ? "sharp" : "blurry";
+        el("gap").textContent = cracked ? "the slide is cracked!" : h < 22 ? "careful — very close!" : "";
+        el("crack").setAttribute("d", cracked ? "M200 40 L260 110 L240 150 L330 220 M260 110 L360 90" : "");
+        el("crackS").setAttribute("d", cracked ? "M60 178 L70 185 L78 178 L88 185" : "");
+        if (cracked) return;
+        if (blur < 0.8) {
+          api.found("focus");
+          if (mag === 40) api.found("x40");
+          if (stained && slide === "cheek") api.found("cheek");
+          say(slide === "onion"
+            ? (stained ? "Onion cells: brick-shaped, each with a cell wall and a dark nucleus." : "Sharp — but the cells are pale and hard to see. Try a drop of stain.")
+            : (stained ? "Cheek cells: rounded and uneven, no cell wall, the nucleus stained dark blue." : "Your cheek cells — faint without a stain."));
+        }
+      }
+      el("fk").oninput = () => {
+        h = 100 - +el("fk").value;
+        if (h < 3 && !cracked) {
+          cracked = true; api.found("crunch");
+          say("CRUNCH — the lens hit the slide. That is why you watch from the SIDE while you lower the lens, and only focus UP while looking through.");
+        }
+        render();
+      };
+      wirePick("mag", m => { mag = +m; say(mag === 40 ? "The ×40 lens is sharp much closer to the slide. Go gently." : `×${mag} lens. ${mag === 4 ? "The widest view — easiest for finding cells." : ""}`); render(); });
+      wirePick("slide", s => { slide = s; stained = cracked = false; el("stain").textContent = "💧 Add a drop of stain"; say(s === "onion" ? "A thin layer of onion skin." : "Cells scraped from inside your cheek."); render(); });
+      el("stain").onclick = () => {
+        stained = true; api.found("stain");
+        say(slide === "onion" ? "Iodine solution stains the onion cells, so the nucleus shows up." : "Methylene blue stains the cheek cells blue — the nucleus goes dark blue.");
+        render();
+      };
+      el("fresh").onclick = () => { cracked = false; h = 90; el("fk").value = 10; stained = false; say("A fresh slide. Start with the lens high up."); render(); };
+      el("fk").value = 10; h = 90;
+      render();
+    }
+
+    // ── build a cell ────────────────────────────────────────────────────────
+    // Drag parts from the tray into the cell (or tap them); drag a part out of the cell to take it
+    // away. The cell reacts to what is missing rather than saying "wrong".
+    function buildBench() {
+      const PARTS = [
+        ["wall", "Cell wall", "#2e8b57", "Strong outer layer. Supports the cell and gives it a fixed shape. Plant cells only."],
+        ["membrane", "Cell membrane", "#7b5ea7", "Thin layer round the cell. Controls what goes in and out."],
+        ["cytoplasm", "Cytoplasm", "#e6c35c", "Jelly that fills the cell. Chemical reactions happen here."],
+        ["nucleus", "Nucleus", "#8a4fa3", "Controls what the cell does."],
+        ["mito", "Mitochondria", "#e07b39", "Release energy from food (respiration)."],
+        ["vacuole", "Sap vacuole", "#a8c8e8", "Big space full of cell sap. Keeps the cell firm. Plant cells only."],
+        ["chloro", "Chloroplasts", "#3aa655", "Absorb light to make food (photosynthesis). Only in plant cells that get light."],
+      ];
+      const has = {}, seen = {};
+      let phase = 0;
+      const r = shell(`<svg viewBox="0 0 400 250" id="bsvg" role="img" aria-label="A cell you build from parts" style="touch-action:none">
+          <rect x="60" y="20" width="280" height="200" rx="18" fill="none" stroke="#c9d2db" stroke-width="2" stroke-dasharray="8 6"/>
+          <text x="200" y="14" text-anchor="middle" font-size="12" fill="#5b6675">drop parts in here · drag a part out to remove it</text>
+          <g id="cell"></g><g id="leak"></g>
+          <text x="200" y="242" text-anchor="middle" font-size="15" font-weight="bold" fill="#2f6f9f" id="what"></text>
+        </svg>
+        <div class="ctrl" id="tray">${PARTS.map(([k, n, c]) => `<button data-part="${k}" style="touch-action:none"><span style="color:${c}">●</span> ${n}</button>`).join("")}</div>
+        <div class="ctrl"><button id="clear">🗑️ Empty</button></div>
+        <p class="muted" id="msg">Drag a part into the box, or tap it. Try building the smallest cell that can stay alive.</p>`);
+      const svg = el("bsvg");
+
+      function toggle(k, on) {
+        if (!!has[k] === on) return;
+        const before = Object.assign({}, has);
+        if (on) has[k] = true; else delete has[k];
+        const p = PARTS.find(x => x[0] === k);
+        if (on) { seen[k] = true; if (Object.keys(seen).length === 7) api.found("jobs"); }
+        say(on ? `${p[1]}: ${p[3]}` : `${p[1]} taken out.`);
+        react(before, k, on);
+        render();
+      }
+      function react(before, k, on) {
+        const working = b => b.membrane && b.cytoplasm && b.mito;
+        if (!on && k === "mito" && working(before)) { api.found("power"); say("Power cut! With no mitochondria, no energy is released from food, so everything in the cell slows to a stop."); }
+        if (!on && k === "nucleus" && before.membrane && before.cytoplasm) { say("No nucleus — nothing is in control. A red blood cell grows up like this on purpose: more room for haemoglobin."); }
+        if (on && k === "wall" && has.membrane && !before.wall) { api.found("shape"); say("The floppy cell now has a fixed shape. The cell wall supports it."); }
+        const key = Object.keys(has).sort().join(",");
+        if (key === "cytoplasm,membrane,mito,nucleus") { api.found("animal"); say("That is an animal cell: membrane, cytoplasm, nucleus and mitochondria. Every cell needs these four."); }
+        if (Object.keys(has).length === 7) { api.found("plant"); say("A plant cell — all seven parts. The wall, the sap vacuole and the chloroplasts are the three extras."); }
+        if (key === "cytoplasm,membrane,mito,nucleus,vacuole,wall") { api.found("root"); say("Still a plant cell — it has a wall and a sap vacuole. No chloroplasts, like a root cell: underground there is no light to use."); }
+      }
+      function render() {
+        if (!el("cell")) return;
+        const wob = has.wall ? 0 : 1, t = phase, out = [];
+        const blob = (R, amp) => Array.from({ length: 24 }, (_, k) => {
+          const a = k / 24 * 6.283, rr = 1 + amp * wob * Math.sin(a * 3 + t) * 0.06;
+          const x = 200 + Math.cos(a) * R[0] * rr, y = 118 + Math.sin(a) * R[1] * rr;
+          return `${k ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`;
+        }).join(" ") + "Z";
+        const rectP = (w, hh) => `M${200 - w} ${118 - hh} H${200 + w} V${118 + hh} H${200 - w} Z`;
+        const outline = has.wall ? rectP(116, 76) : blob([110, 76], 1);
+        if (has.cytoplasm && has.membrane) out.push(`<path d="${outline}" fill="#f6e7ad" data-in="cytoplasm"/>`);
+        if (has.wall) out.push(`<path d="${rectP(124, 84)}" fill="none" stroke="#2e8b57" stroke-width="9" data-in="wall"/>`);
+        if (has.vacuole) out.push(`<rect x="${has.nucleus ? 150 : 140}" y="70" width="120" height="96" rx="20" fill="#cfe2f5" stroke="#6f9fcc" stroke-width="2" data-in="vacuole"/>`);
+        if (has.nucleus) out.push(`<circle cx="118" cy="${has.vacuole ? 112 : 118}" r="20" fill="#8a4fa3" data-in="nucleus"/><circle cx="114" cy="114" r="6" fill="#5b2e70" pointer-events="none"/>`);
+        const powered = has.mito && has.membrane && has.cytoplasm;
+        if (has.mito) [[108, 168], [292, 68], [290, 170], [140, 60]].forEach(([x, y], i) => out.push(`<ellipse cx="${x}" cy="${y + (powered ? Math.sin(t * 2 + i) * 2 : 0)}" rx="14" ry="7" fill="#e07b39" data-in="mito"/>`));
+        if (has.chloro) [[98, 60], [300, 118], [98, 176], [230, 186], [230, 50], [160, 186]].forEach(([x, y]) => out.push(`<ellipse cx="${x}" cy="${y}" rx="11" ry="7" fill="#3aa655" stroke="#1f6b35" data-in="chloro"/>`));
+        if (has.membrane) out.push(`<path d="${outline}" fill="none" stroke="#7b5ea7" stroke-width="4" data-in="membrane"/>`);
+        if (has.cytoplasm && !has.membrane) out.push(`<path d="${blob([110, 76], 1)}" fill="#f6e7ad" opacity=".35" data-in="cytoplasm"/>`);
+        el("cell").innerHTML = out.join("");
+        const leak = has.cytoplasm && !has.membrane;
+        el("leak").innerHTML = leak ? [0, 1, 2, 3].map(i => `<circle cx="${130 + i * 45}" cy="${200 + ((t * 20 + i * 13) % 40)}" r="6" fill="#e6c35c"/>`).join("") : "";
+        const n = Object.keys(has).length;
+        el("what").textContent = !n ? "" : leak ? "the cytoplasm is leaking out!" : Object.keys(has).length === 7 ? "a plant cell" :
+          (has.wall || has.vacuole || has.chloro) ? "looks like a plant cell" : has.membrane && has.cytoplasm && has.nucleus && has.mito ? "an animal cell" : "not alive yet…";
+        root.querySelectorAll("[data-part]").forEach(b => b.classList.toggle("on", !!has[b.dataset.part]));
+      }
+      (function loop() {
+        if (!alive(r)) return;
+        phase += 0.05;
+        if (has.cytoplasm && !has.membrane && phase > 0.5) api.found("spill");
+        render(); requestAnimationFrame(loop);
+      })();
+      function inBox(e) { const b = svg.getBoundingClientRect(), x = (e.clientX - b.left) / b.width * 400, y = (e.clientY - b.top) / b.height * 250; return x > 60 && x < 340 && y > 20 && y < 220; }
+      // One drag routine for both directions: from the tray in, or from the cell out.
+      function drag(e, k, fromCell) {
+        const p = PARTS.find(x => x[0] === k), x0 = e.clientX, y0 = e.clientY;
+        let ghost = null, moved = false;
+        const mv = ev => {
+          if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 6) {
+            moved = true; ghost = document.createElement("div");
+            ghost.textContent = "● " + p[1];
+            ghost.style.cssText = `position:fixed;pointer-events:none;z-index:99;font-weight:700;color:${p[2]};background:#fff;border:2px solid ${p[2]};border-radius:999px;padding:4px 10px`;
+            document.body.appendChild(ghost);
+          }
+          if (ghost) { ghost.style.left = ev.clientX + 8 + "px"; ghost.style.top = ev.clientY + 8 + "px"; }
+        };
+        const up = ev => {
+          removeEventListener("pointermove", mv); removeEventListener("pointerup", up); removeEventListener("pointercancel", up);
+          if (ghost) ghost.remove();
+          if (!moved) { if (fromCell) say(`${p[1]}: ${p[3]}`); else toggle(k, !has[k]); return; }
+          if (fromCell && !inBox(ev)) toggle(k, false);
+          if (!fromCell && inBox(ev)) toggle(k, true);
+        };
+        addEventListener("pointermove", mv); addEventListener("pointerup", up); addEventListener("pointercancel", up);
+      }
+      root.querySelectorAll("[data-part]").forEach(b => {
+        b.addEventListener("pointerdown", e => { e.preventDefault(); drag(e, b.dataset.part, false); });
+        b.onclick = e => { if (e.detail === 0) toggle(b.dataset.part, !has[b.dataset.part]); };   // keyboard
+      });
+      svg.addEventListener("pointerdown", e => { const k = e.target.dataset && e.target.dataset.in; if (k) { e.preventDefault(); drag(e, k, true); } });
+      el("clear").onclick = () => { Object.keys(has).forEach(k => delete has[k]); say("An empty box. Start again."); render(); };
+      render();
+    }
+
+    // ── the job centre ──────────────────────────────────────────────────────
+    // Five specialised cells, one job each. Each gets one or two things to change and a picture of
+    // how well the job is going, so "adapted" means "look, it works better".
+    function jobBench() {
+      const JOBS = [["rbc", "🩸 Red blood cell"], ["neuro", "⚡ Neurone"], ["cilia", "🧹 Ciliated cell"], ["root", "🌱 Root hair cell"], ["pal", "☀️ Palisade cell"]];
+      let job = "rbc";
+      const r = shell(`${pickRow("job", JOBS, job)}<div id="job"></div><p class="muted" id="msg"></p>`);
+      wirePick("job", j => { job = j; open(); });
+      let jr = 0;
+      function open() {
+        jr++; const me = jr, live = () => alive(r) && me === jr && el("job");
+        ({ rbc, neuro, cilia, root: rootHair, pal })[job](live);
+      }
+      function rbc(live) {
+        let nucleus = true, size = 30, x = 20, stuck = false;
+        el("job").innerHTML = `<svg viewBox="0 0 400 180" role="img" aria-label="A red blood cell squeezing through a capillary">
+            <text x="10" y="18" font-size="13" fill="#5b6675">Job: carry oxygen around the body</text>
+            <path d="M0 50 H160 Q180 50 190 75 H290 Q300 50 320 50 H400 M0 150 H160 Q180 150 190 125 H290 Q300 150 320 150 H400" fill="none" stroke="#c0392b" stroke-width="4"/>
+            <text x="240" y="100" text-anchor="middle" font-size="11" fill="#b4531f">capillary</text>
+            <g id="rc"></g><text x="10" y="176" font-size="13" fill="#5b6675" id="o2"></text></svg>
+          <div class="ctrl"><button id="nuc">Take the nucleus out</button></div>
+          <div class="ctrl slider"><label for="sz">Cell size</label><input type="range" id="sz" min="18" max="60" value="30"></div>`;
+        say("A red blood cell carries oxygen using haemoglobin. Try changing it.");
+        el("nuc").onclick = () => {
+          nucleus = !nucleus; el("nuc").textContent = nucleus ? "Take the nucleus out" : "Put the nucleus back";
+          if (!nucleus) { api.found("rbc"); say("No nucleus — more room for haemoglobin, so it carries more oxygen."); } else say("With a nucleus there is less room for haemoglobin.");
+        };
+        el("sz").oninput = () => { size = +el("sz").value; stuck = false; };
+        (function loop() {
+          if (!live()) return;
+          const gapHalf = 25;
+          if (!stuck) x += 1.6;
+          if (x > 150 && x < 200 && size / 2 > gapHalf + 2) {
+            if (!stuck) { stuck = true; api.found("stuck"); say("Stuck! Too big to fit through the capillary. Real red blood cells are very small and can bend."); }
+            x = 150;
+          }
+          if (x > 420) x = -30;
+          const cap = nucleus ? 5 : 9, s = size / 2, squash = x > 170 && x < 300 ? Math.min(1, gapHalf / s) : 1;
+          el("rc").innerHTML = `<ellipse cx="${x}" cy="100" rx="${s}" ry="${s * squash}" fill="#d9534f" stroke="#922" stroke-width="2"/>`
+            + (nucleus ? `<circle cx="${x - s * 0.3}" cy="100" r="${s * 0.35}" fill="#7a2230"/>` : "")
+            + Array.from({ length: cap }, (_, i) => `<circle cx="${x + Math.cos(i * 2.4) * s * 0.55 + (nucleus ? s * 0.25 : 0)}" cy="${100 + Math.sin(i * 2.4) * s * 0.55 * squash}" r="3" fill="#2f6f9f"/>`).join("");
+          el("o2").textContent = `oxygen carried in this cell: ${cap}${stuck ? " — but it is stuck" : ""}`;
+          requestAnimationFrame(loop);
+        })();
+      }
+      function neuro(live) {
+        let sheath = false, going = false, pos = 0, t0 = 0, times = {};
+        el("job").innerHTML = `<svg viewBox="0 0 400 150" role="img" aria-label="A neurone sending a signal">
+            <text x="10" y="18" font-size="13" fill="#5b6675">Job: carry signals around the body</text>
+            <circle cx="40" cy="80" r="22" fill="#e8c5e0" stroke="#8a4fa3" stroke-width="3"/><circle cx="40" cy="80" r="7" fill="#8a4fa3"/>
+            <path d="M24 64 L8 44 M22 96 L6 116 M40 58 L40 32" stroke="#8a4fa3" stroke-width="3"/>
+            <line x1="62" y1="80" x2="350" y2="80" stroke="#8a4fa3" stroke-width="5"/>
+            <g id="sh"></g><path d="M350 80 L385 60 M350 80 L388 80 M350 80 L385 100" stroke="#8a4fa3" stroke-width="3"/>
+            <circle id="sig" cx="62" cy="80" r="7" fill="#f2b705" opacity="0"/>
+            <text x="200" y="130" text-anchor="middle" font-size="13" fill="#5b6675" id="tm">long, thin axon →</text></svg>
+          <div class="ctrl"><button id="send">⚡ Send a signal</button><button id="wrap">Wrap the axon in a fatty sheath</button></div>`;
+        say("A neurone has a long thin axon to carry a signal a long way. Send one.");
+        const drawSheath = () => el("sh").innerHTML = sheath ? Array.from({ length: 6 }, (_, i) => `<rect x="${72 + i * 46}" y="71" width="38" height="18" rx="9" fill="#f5e6a8" stroke="#c9a227"/>`).join("") : "";
+        el("wrap").onclick = () => { sheath = !sheath; el("wrap").textContent = sheath ? "Take the fatty sheath off" : "Wrap the axon in a fatty sheath"; drawSheath(); };
+        el("send").onclick = () => { if (going) return; going = true; pos = 0; t0 = performance.now(); };
+        (function loop(now) {
+          if (!live()) return;
+          if (going) {
+            pos += sheath ? 7 : 2.2;
+            const x = sheath ? 62 + Math.min(288, Math.floor(pos / 46) * 46 + 46) : 62 + Math.min(288, pos);
+            el("sig").setAttribute("cx", Math.min(350, x)); el("sig").setAttribute("opacity", 1);
+            if (pos >= 288) {
+              going = false; const s = ((now - t0) / 1000).toFixed(1); times[sheath ? "fast" : "slow"] = s;
+              el("tm").textContent = `the signal took ${s} s${sheath ? " — with a fatty sheath" : ""}`;
+              if (sheath) { api.found("sheath"); say(`With the fatty sheath the signal jumps along — ${s} seconds${times.slow ? `, not ${times.slow}` : ""}.`); }
+              else say(`${s} seconds without a sheath. Now wrap it and try again.`);
+            }
+          }
+          requestAnimationFrame(loop);
+        })(performance.now());
+      }
+      function cilia(live) {
+        let mito = 1, y = 150, beat = 0, done = false;
+        el("job").innerHTML = `<svg viewBox="0 0 400 190" role="img" aria-label="Ciliated cells sweeping mucus up an airway">
+            <text x="10" y="18" font-size="13" fill="#5b6675">Job: sweep mucus up and out of the airway</text>
+            <text x="300" y="36" font-size="12" fill="#5b6675">↑ to the throat</text>
+            <rect x="60" y="30" width="40" height="160" fill="#f4d4d4" stroke="#c98"/><g id="hairs"></g>
+            <g id="muc"></g></svg>
+          <div class="ctrl slider"><label for="mi">Mitochondria in each cell</label><input type="range" id="mi" min="0" max="10" value="1"><span class="chip" id="miv">1</span></div>`;
+        say("Mucus traps dust. The cilia beat to sweep it up. They need energy from the mitochondria.");
+        el("mi").oninput = () => { mito = +el("mi").value; el("miv").textContent = mito; };
+        (function loop() {
+          if (!live()) return;
+          beat += mito * 0.06;
+          y = Math.max(34, Math.min(170, y - (mito - 2) * 0.2));
+          if (y <= 34 && !done) { done = true; api.found("sweep"); say("Swept all the way up to the throat, where it is swallowed. Lots of mitochondria = lots of energy for the cilia."); }
+          if (mito === 0) say("No energy, no beating. The mucus slides back down.");
+          el("hairs").innerHTML = Array.from({ length: 14 }, (_, i) => { const yy = 40 + i * 11, a = Math.sin(beat + i * 0.5) * 10; return `<path d="M100 ${yy} q12 ${-4 + a * 0.2} 22 ${-8 + a * 0.4}" stroke="#b86" stroke-width="2" fill="none"/>`; }).join("");
+          el("muc").innerHTML = `<ellipse cx="135" cy="${y}" rx="16" ry="24" fill="#b8d98b" opacity=".85"/><circle cx="130" cy="${y - 6}" r="3" fill="#555"/><circle cx="140" cy="${y + 8}" r="3" fill="#555"/>`;
+          requestAnimationFrame(loop);
+        })();
+      }
+      function rootHair(live) {
+        let len = 10, water = 0, done = false;
+        el("job").innerHTML = `<svg viewBox="0 0 400 190" role="img" aria-label="A root hair cell reaching between soil particles">
+            <text x="10" y="18" font-size="13" fill="#5b6675">Job: take in water and minerals from the soil</text>
+            <g id="soil"></g><rect x="20" y="80" width="70" height="44" fill="#eef7e4" stroke="#2e8b57" stroke-width="3"/>
+            <rect x="30" y="90" width="50" height="24" rx="6" fill="#cfe2f5"/><path id="hr" d="" fill="#eef7e4" stroke="#2e8b57" stroke-width="3"/>
+            <rect x="350" y="40" width="34" height="120" fill="none" stroke="#7f8c99" stroke-width="3"/><rect id="gl" x="352" y="158" width="30" height="0" fill="#4a90d9"/>
+            <text x="367" y="178" text-anchor="middle" font-size="11" fill="#5b6675">water in</text></svg>
+          <div class="ctrl slider"><label for="hl">Root hair length</label><input type="range" id="hl" min="0" max="240" value="10"></div>`;
+        say("Water moves in through the cell wall, the membrane and the cytoplasm, into the sap vacuole. Grow the hair.");
+        const soil = []; for (let i = 0; i < 24; i++) soil.push([100 + (i * 53) % 240, 40 + (i * 37) % 130]);
+        el("soil").innerHTML = soil.map(([x, y]) => (Math.abs(y - 102) < 18 ? "" : `<circle cx="${x}" cy="${y}" r="14" fill="#c8a57a"/>`)).join("") + soil.map(([x, y], i) => i % 3 ? "" : `<circle cx="${x + 20}" cy="${y + 10}" r="4" fill="#4a90d9"/>`).join("");
+        el("hl").oninput = () => { len = +el("hl").value; water = 0; done = false; };
+        (function loop() {
+          if (!live()) return;
+          el("hr").setAttribute("d", `M90 96 H${90 + len} a6 6 0 0 1 0 12 H90`);
+          water = Math.min(116, water + (4 + len) * 0.0035);
+          el("gl").setAttribute("y", 158 - water); el("gl").setAttribute("height", water);
+          if (water >= 116 && !done) { done = true; if (len > 150) { api.found("hair"); say("Full! The long thin hair has a big surface area and reaches between the soil particles."); } else say("Full at last — slowly. Try a longer hair and watch how much faster it fills."); }
+          requestAnimationFrame(loop);
+        })();
+      }
+      function pal(live) {
+        let n = 4, top = false, sugar = 0;
+        el("job").innerHTML = `<svg viewBox="0 0 400 190" role="img" aria-label="A palisade cell in a leaf, under the sun">
+            <text x="10" y="18" font-size="13" fill="#5b6675">Job: make food by photosynthesis</text>
+            <circle cx="360" cy="30" r="18" fill="#f2b705"/><rect x="20" y="50" width="260" height="120" fill="#e3f1d8" stroke="#2e8b57"/>
+            <text x="286" y="60" font-size="11" fill="#5b6675">top of leaf</text><text x="286" y="168" font-size="11" fill="#5b6675">bottom</text>
+            <g id="pc"></g><rect x="320" y="60" width="30" height="110" fill="none" stroke="#7f8c99" stroke-width="2"/><rect id="sg" x="322" y="168" width="26" height="0" fill="#d99a00"/>
+            <text x="335" y="184" text-anchor="middle" font-size="11" fill="#5b6675">sugar</text></svg>
+          <div class="ctrl slider"><label for="cn">Chloroplasts</label><input type="range" id="cn" min="0" max="20" value="4"><span class="chip" id="cnv">4</span></div>
+          <div class="ctrl"><button id="mv">Move it to the top of the leaf</button></div>`;
+        say("Palisade cells are tall and thin. Give this one chloroplasts and put it where the light is.");
+        el("cn").oninput = () => { n = +el("cn").value; el("cnv").textContent = n; sugar = 0; };
+        el("mv").onclick = () => { top = !top; sugar = 0; el("mv").textContent = top ? "Move it to the bottom of the leaf" : "Move it to the top of the leaf"; };
+        (function loop() {
+          if (!live()) return;
+          const light = top ? 1 : 0.3, y0 = top ? 54 : 106;
+          sugar = Math.min(106, sugar + n * light * 0.035);
+          el("pc").innerHTML = `<rect x="130" y="${y0}" width="36" height="62" rx="8" fill="#f7fbf2" stroke="#2e8b57" stroke-width="2"/>`
+            + Array.from({ length: n }, (_, i) => `<ellipse cx="${138 + (i % 3) * 10}" cy="${y0 + 6 + Math.floor(i / 3) * 8}" rx="4" ry="3" fill="#3aa655"/>`).join("")
+            + `<path d="M350 40 L${150} ${y0}" stroke="#f2b705" stroke-width="${1 + light * 3}" stroke-dasharray="6 5" opacity=".8"/>`;
+          el("sg").setAttribute("y", 168 - sugar); el("sg").setAttribute("height", sugar);
+          if (sugar >= 106 && n >= 15 && top) { api.found("palisade"); say("Lots of chloroplasts, at the top of the leaf where the light is strongest — a sugar factory."); }
+          requestAnimationFrame(loop);
+        })();
+      }
+      open();
+    }
+
+    // ── zoom out ────────────────────────────────────────────────────────────
+    function zoomBench() {
+      const PATHS = {
+        human: [["Cell", "One ciliated cell", "🟣"], ["Tissue", "Ciliated epithelium — lots of similar cells working together", "🟣🟣🟣"],
+          ["Organ", "The windpipe and lungs — made of several different tissues", "🫁"], ["Organ system", "The respiratory system — organs working together to take in oxygen", "🫁👃"], ["Organism", "A whole person", "🧍"]],
+        tree: [["Cell", "One palisade cell", "🟩"], ["Tissue", "The palisade layer — lots of similar cells", "🟩🟩🟩"],
+          ["Organ", "A leaf — made of several different tissues", "🍃"], ["Organ system", "The shoot system — stem, leaves and flowers", "🌿🌼"], ["Organism", "A whole plant", "🌻"]],
+      };
+      let path = "human", lv = 0;
+      shell(`${pickRow("path", [["human", "🧍 Human"], ["tree", "🌻 Plant"]], path)}
+        <div class="card" style="text-align:center"><div id="zpic" style="font-size:64px;line-height:1.2;min-height:84px"></div>
+          <div id="zname" style="font-size:1.3em;font-weight:700"></div><div class="muted" id="zdesc"></div></div>
+        <div class="ctrl slider"><label for="zl">Zoom out</label><input type="range" id="zl" min="0" max="4" value="0"></div>
+        <div class="readout" id="ladder"></div><p class="muted" id="msg">Slide to zoom out. Smallest first: cell, tissue, organ, organ system.</p>`);
+      function render() {
+        const L = PATHS[path][lv];
+        el("zpic").textContent = L[2]; el("zname").textContent = L[0]; el("zdesc").textContent = L[1];
+        el("ladder").innerHTML = PATHS[path].map((x, i) => `<span class="chip" style="${i === lv ? "border-color:var(--brand)" : i > lv ? "opacity:.4" : ""}">${x[0]}</span>`).join(" → ");
+        if (lv === 4) { api.found(path); say(path === "human" ? "From one cell to a whole person. A ciliated cell belongs to the respiratory system." : "From one palisade cell to a whole plant."); }
+      }
+      el("zl").oninput = () => { lv = +el("zl").value; render(); };
+      wirePick("path", p => { path = p; lv = 0; el("zl").value = 0; render(); });
+      render();
+    }
+
+    draw();
+  },
+});
+
 // Breathing Machine — Grade 7 Unit 1 (Respiration).
 //
 // Four benches behind one set of tabs: the bell-jar model you pull, a runner whose oxygen you have
@@ -1399,6 +1831,398 @@ ARCADE.toy({
       });
     }
     render();
+  },
+});
+
+// Leaf Lab — Grade 8 Unit 1 (Photosynthesis and the carbon cycle).
+//
+// Five benches behind one set of tabs: pondweed bubbling under a lamp you move (the graph plots
+// itself from the student's own counts), the starch test done in any order the student likes,
+// hydrogencarbonate indicator tubes they fill themselves, one carbon atom they walk round the
+// cycle, and a planet whose thermostat they turn with fuel and forests. Setting the ethanol on
+// fire is a discovery, not a fail — it is exactly why the burner goes off first.
+ARCADE.toy({
+  id: "g08-u01-leaflab", unit: "g08-u01", order: 1,
+  name: "Leaf Lab", icon: "🌿",
+  blurb: "Make a plant bubble, then follow one carbon atom round the world",
+  discoveries: [
+    ["bubbles", "It is bubbling", "Shine the lamp on the pondweed and watch the bubbles"],
+    ["dark", "Lights out", "Switch the lamp off and watch the bubbles stop"],
+    ["graph", "You drew the curve", "Count bubbles at five different distances"],
+    ["relight", "It is oxygen!", "Test the gas the plant made with a glowing splint"],
+    ["whoosh", "Whoosh!", "Put the ethanol in while the burner is still on"],
+    ["hidden", "Too green to tell", "Add iodine before taking the green out"],
+    ["pattern", "Only the green part", "Get blue-black only where the leaf was green"],
+    ["destarch", "Kept in the dark", "Test a leaf from a plant kept in the dark"],
+    ["yellow", "More carbon dioxide", "Turn the indicator yellow"],
+    ["purple", "Carbon dioxide used up", "Turn the indicator purple"],
+    ["plantdark", "Plants respire too", "Leave a plant in the dark and watch the colour"],
+    ["maggotlight", "Light does not help maggots", "Put maggots in the light"],
+    ["control", "The control", "Run a tube with nothing in it"],
+    ["photo", "Photosynthesis", "Move the carbon atom from the air into a plant"],
+    ["feed", "Feeding", "Move the carbon atom into an animal"],
+    ["decomp", "Decomposition", "Let decomposers release the carbon atom"],
+    ["fossil", "Millions of years", "Bury the carbon atom until it becomes a fossil fuel"],
+    ["burn", "Combustion", "Burn the carbon atom back into the air"],
+    ["loop", "Round and round", "Bring the carbon atom back to the air five times"],
+    ["warm", "Two degrees warmer", "Burn enough fuel to warm the planet by 2 °C"],
+    ["cool", "Forests pull it back", "Bring the carbon dioxide back down after it went high"],
+    ["asteroid", "66 million years ago", "Let the asteroid hit"],
+  ],
+  mount(root, api) {
+    let tab = "pond", run = 0;
+    const alive = r => r === run && document.body.contains(root);
+    const tabs = [["pond", "💡 Pondweed"], ["starch", "🧪 Starch test"], ["ind", "🌈 Indicator"], ["cycle", "♻️ Carbon cycle"], ["planet", "🌍 Planet"]];
+    const el = id => document.getElementById(id);
+    const say = m => { const p = el("msg"); if (p && p.textContent !== m) { p.textContent = m; api.say(m); } };
+
+    function shell(inner) {
+      run++;
+      root.innerHTML = `<div class="ctrl">${tabs.map(([k, n]) =>
+        `<button data-tab="${k}" class="${k === tab ? "on" : ""}">${n}</button>`).join("")}</div><div id="bench">${inner}</div>`;
+      root.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { tab = b.dataset.tab; draw(); });
+      return run;
+    }
+    function draw() { ({ pond: pondBench, starch: starchBench, ind: indBench, cycle: cycleBench, planet: planetBench })[tab](); }
+    const pickRow = (attr, list, on) => `<div class="ctrl">${list.map(([k, n]) => `<button data-${attr}="${k}" class="${k === on ? "on" : ""}">${n}</button>`).join("")}</div>`;
+    const wirePick = (attr, fn) => root.querySelectorAll(`[data-${attr}]`).forEach(b => b.onclick = () => {
+      root.querySelectorAll(`[data-${attr}]`).forEach(x => x.classList.toggle("on", x === b)); fn(b.dataset[attr]);
+    });
+
+    // ── pondweed and a lamp ────────────────────────────────────────────────
+    // Light intensity falls with the square of the distance, and the rate levels off when the plant
+    // is going as fast as it can. The student's counts carry a little scatter, so the curve of best
+    // fit is something they see emerge rather than a line through perfect dots.
+    function pondBench() {
+      let d = 30, on = true, gas = 0, since = 0, phase = 0, counting = 0, counted = 0, bubbles = [], pts = {}, off = 0;
+      const rate = () => { if (!on) return 0; const I = (10 / d) ** 2; return 70 * I / (I + 0.6); };   // bubbles a minute
+      const r = shell(`<svg viewBox="0 0 400 260" id="psvg" role="img" aria-label="Pondweed in a beaker under a lamp, and a graph" style="touch-action:none">
+          <rect x="30" y="100" width="110" height="130" fill="#dbeaf6" stroke="#7f8c99" stroke-width="3"/>
+          <path d="M85 225 q-10 -30 0 -60 q10 -30 0 -50 M85 205 q14 -10 20 -24 M85 185 q-16 -8 -22 -22" stroke="#2e8b57" stroke-width="5" fill="none"/>
+          <path d="M60 170 L85 140 L110 170" fill="none" stroke="#9aa6b3" stroke-width="3"/>
+          <rect x="77" y="60" width="16" height="84" rx="8" fill="#eef5fb" stroke="#7f8c99" stroke-width="2"/>
+          <rect id="gas" x="79" y="62" width="12" height="0" fill="#fff"/>
+          <g id="bub"></g>
+          <g id="lamp" class="grab"><rect x="-14" y="120" width="28" height="30" rx="4" fill="#5b6675"/><path d="M-14 150 L-24 176 L24 176 L14 150 Z" fill="#8d97a3"/>
+            <path id="beam" d="M-20 176 L-90 200 L-90 150 Z" fill="#f2d24c" opacity=".35"/></g>
+          <text x="200" y="250" text-anchor="middle" font-size="12" fill="#5b6675" id="dist"></text>
+          <rect x="248" y="24" width="140" height="130" fill="none" stroke="#c9d2db" stroke-width="2"/>
+          <text x="318" y="170" text-anchor="middle" font-size="11" fill="#5b6675">distance from lamp (cm) →</text>
+          <text x="244" y="18" font-size="11" fill="#5b6675">bubbles per minute</text><g id="plot"></g>
+        </svg>
+        <div class="ctrl slider"><label for="ds">Lamp distance</label><input type="range" id="ds" min="5" max="50" value="30"><span class="chip" id="dsv">30 cm</span></div>
+        <div class="ctrl"><button id="sw">💡 Lamp off</button><button id="cnt">⏱️ Count for one minute</button><button id="spl">🔥 Test the gas</button></div>
+        <p class="muted" id="msg">Drag the lamp, or use the slider. Count the bubbles at different distances.</p>`);
+      const svg = el("psvg");
+      const setD = v => { d = Math.max(5, Math.min(50, Math.round(v))); el("ds").value = d; el("dsv").textContent = d + " cm"; };
+      el("ds").oninput = () => setD(+el("ds").value);
+      el("sw").onclick = () => { on = !on; off = 0; el("sw").textContent = on ? "💡 Lamp off" : "💡 Lamp on"; say(on ? "Light on." : "Dark. Watch the bubbles."); };
+      el("cnt").onclick = () => { if (counting) return; counting = 4; counted = 0; say(`Counting at ${d} cm… (one minute, sped up)`); };
+      el("spl").onclick = () => {
+        if (gas < 40) { say("Not enough gas in the tube yet. Let the plant bubble for longer — a closer lamp helps."); return; }
+        api.found("relight"); gas = 0;
+        say("The glowing splint RELIGHTS. The gas is oxygen — a product of photosynthesis.");
+      };
+      let dragging = false;
+      el("lamp").addEventListener("pointerdown", e => { dragging = true; el("lamp").setPointerCapture(e.pointerId); });
+      svg.addEventListener("pointermove", e => { if (!dragging) return; const b = svg.getBoundingClientRect(); setD(((e.clientX - b.left) / b.width * 400 - 150) / 1.9 + 5); });
+      addEventListener("pointerup", () => { dragging = false; });
+      let last = performance.now();
+      (function loop(now) {
+        if (!alive(r)) return;
+        const dt = Math.min(0.05, (now - last) / 1000); last = now;
+        const speed = counting ? 15 : 4;                 // plant-seconds per real second: a counted minute takes 4 s
+        since += dt * rate() / 60 * speed;
+        while (since >= 1) {
+          since -= 1; bubbles.push({ x: 85 + (Math.random() - 0.5) * 20, y: 150 }); gas = Math.min(80, gas + 0.4);
+          if (counting) counted++;
+          api.found("bubbles");
+        }
+        if (!on) { off += dt; if (off > 3) { api.found("dark"); say("No light, no photosynthesis — the bubbles stop."); } }
+        if (counting) {
+          counting -= dt;
+          if (counting <= 0) {
+            counting = 0; const got = Math.max(0, counted + Math.round((Math.random() - 0.5) * 4));
+            pts[d] = got; say(`${got} bubbles in one minute at ${d} cm.`);
+            if (Object.keys(pts).length >= 5) { api.found("graph"); say(`${got} bubbles at ${d} cm. The nearer the lamp, the more light — and the faster the plant photosynthesises.`); }
+          }
+        }
+        bubbles = bubbles.filter(b => (b.y -= dt * 60) > 144);
+        phase += dt;
+        el("bub").innerHTML = bubbles.map(b => `<circle cx="${b.x}" cy="${b.y}" r="3" fill="#fff" stroke="#7fa6c9"/>`).join("");
+        el("gas").setAttribute("height", gas);
+        el("lamp").setAttribute("transform", `translate(${150 + (d - 5) * 1.9} 0)`);
+        el("beam").setAttribute("opacity", on ? 0.45 * Math.min(1, 10 / d) + 0.1 : 0);
+        el("dist").textContent = `lamp ${d} cm away${d < 8 ? " — keep the lamp and wires away from the water!" : ""}`;
+        const px = x => 248 + 140 * x / 50, py = y => 154 - 130 * y / 70;
+        const keys = Object.keys(pts).map(Number).sort((a, b) => a - b);
+        const curve = keys.length >= 4 ? `<path d="${Array.from({ length: 46 }, (_, i) => { const x = 5 + i; const I = (10 / x) ** 2; return `${i ? "L" : "M"}${px(x).toFixed(1)} ${py(70 * I / (I + 0.6)).toFixed(1)}`; }).join(" ")}" fill="none" stroke="#2e8b57" stroke-width="2"/>` : "";
+        el("plot").innerHTML = curve + keys.map(k => `<path d="M${px(k) - 4} ${py(pts[k]) - 4} l8 8 m0 -8 l-8 8" stroke="#b4531f" stroke-width="2"/>`).join("")
+          + `<path d="M${px(d)} 154 l-4 8 h8 Z" fill="#2f6f9f"/>`;
+        requestAnimationFrame(loop);
+      })(performance.now());
+      setD(30);
+    }
+
+    // ── the starch test ────────────────────────────────────────────────────
+    // Every button works in any order. The leaf only tells the truth when the steps go in the order
+    // the textbook gives, and each shortcut shows its own reason for the step it skipped.
+    function starchBench() {
+      let leaf = "light", burner = true, boiled = false, ethanol = false, soft = false, iodine = false, fire = 0;
+      const r = shell(`${pickRow("lf", [["light", "☀️ Leaf from a plant in the light"], ["darkp", "🌑 Leaf from a plant kept in the dark"]], "light")}
+        <svg viewBox="0 0 400 220" role="img" aria-label="A variegated leaf, a beaker over a burner, and a tube of ethanol">
+          <rect x="30" y="80" width="90" height="90" fill="#dbeaf6" stroke="#7f8c99" stroke-width="3"/>
+          <rect x="62" y="40" width="26" height="110" rx="10" fill="#f6f2e0" stroke="#7f8c99" stroke-width="2" id="tube" opacity="0"/>
+          <path id="flame" d="M60 195 Q75 170 90 195 Z" fill="#f2b705"/><rect x="66" y="196" width="18" height="18" fill="#8d97a3"/>
+          <g id="fire"></g>
+          <g transform="translate(270 110)"><rect x="-110" y="70" width="220" height="20" fill="#fff" stroke="#c9d2db" opacity="0" id="tile"/>
+            <path id="leafO" d="M0 -90 C70 -60 80 40 0 80 C-80 40 -70 -60 0 -90 Z" fill="#f1f1e6" stroke="#7f8c99" stroke-width="2"/>
+            <path id="leafI" d="M0 -66 C46 -44 52 28 0 56 C-52 28 -46 -44 0 -66 Z" fill="#3aa655"/>
+            <path d="M0 -90 L0 80" stroke="#7f8c99" stroke-width="1.5"/><path id="cracks" d="" stroke="#5b3" stroke-width="0" fill="none"/></g>
+          <text x="270" y="16" text-anchor="middle" font-size="12" fill="#5b6675" id="state"></text>
+        </svg>
+        <div class="ctrl"><button id="b1">🫧 Boil the leaf in water</button><button id="b2">🔥 Burner off</button>
+          <button id="b3">🧴 Put the leaf in ethanol</button><button id="b4">💧 Dip in warm water</button><button id="b5">🟤 Add iodine on a white tile</button></div>
+        <div class="ctrl"><button id="new">🍃 New leaf</button></div>
+        <p class="muted" id="msg">Test the leaf for starch. Do the steps in any order you like — and see what happens.</p>`);
+      const colourOf = () => {
+        if (!iodine) return [ethanol ? "#f1efd8" : "#3aa655", "#f1f1e6"];
+        if (!boiled) return [ethanol ? "#d59a4a" : "#6d7a2e", "#d59a4a"];            // iodine cannot get in: orange-brown
+        const starch = leaf === "light";
+        if (!ethanol) return [starch ? "#1f3326" : "#5f6a2c", "#d59a4a"];              // green hides the result
+        return [starch ? "#1b1d4a" : "#d59a4a", "#d59a4a"];
+      };
+      function render() {
+        if (!el("leafI")) return;
+        const [inner, outer] = colourOf();
+        el("leafI").setAttribute("fill", inner); el("leafO").setAttribute("fill", outer);
+        el("flame").setAttribute("opacity", burner ? 1 : 0);
+        el("tube").setAttribute("opacity", ethanol ? 1 : 0);
+        el("tube").setAttribute("fill", ethanol ? "#cfe8b5" : "#f6f2e0");
+        el("tile").setAttribute("opacity", iodine ? 1 : 0);
+        el("cracks").setAttribute("stroke-width", iodine && ethanol && !soft ? 2 : 0);
+        el("cracks").setAttribute("d", "M-30 -20 L-10 0 L-26 20 M20 -40 L34 -10 M16 30 L36 50");
+        el("b2").textContent = burner ? "🔥 Burner off" : "🔥 Burner on";
+        el("state").textContent = [boiled && "boiled", !burner && "burner off", ethanol && "chlorophyll out", soft && "softened", iodine && "iodine on"].filter(Boolean).join(" · ");
+      }
+      wirePick("lf", v => { leaf = v; reset(); say(v === "light" ? "A green-and-white leaf from a plant that stood in the sun." : "A leaf from the same kind of plant, kept in the dark for two days."); });
+      function reset() { burner = true; boiled = ethanol = soft = iodine = false; render(); }
+      el("new").onclick = () => { reset(); say("A fresh leaf."); };
+      el("b1").onclick = () => {
+        if (iodine) { say("Already tested. Take a new leaf."); return; }
+        if (!burner) { say("The burner is off — turn it on to boil the water."); return; }
+        boiled = true; say("Boiling breaks the cell membranes, so the iodine will be able to reach the starch.");
+        render();
+      };
+      el("b2").onclick = () => {
+        burner = !burner; render();
+        if (burner && ethanol && !iodine) { fire = 1.4; api.found("whoosh"); say("WHOOSH! The ethanol is still there and it is very flammable. Keep the burner off while ethanol is out."); return; }
+        say(burner ? "Burner on." : "Burner off. Now it is safe to use ethanol.");
+      };
+      el("b3").onclick = () => {
+        if (burner) {
+          fire = 1.4; api.found("whoosh");
+          say("WHOOSH! Ethanol is very flammable — it caught fire from the burner. That is why you turn the burner OFF first and let the hot water heat the ethanol.");
+          return;
+        }
+        if (!boiled) { say("The ethanol cannot get into the cells yet. Boil the leaf first."); return; }
+        ethanol = true; say("The green chlorophyll dissolves out into the ethanol. The leaf goes pale — and brittle.");
+        render();
+      };
+      el("b4").onclick = () => { if (!ethanol) { say("Nothing to soften yet."); return; } soft = true; say("Warm water softens the brittle leaf so it can be spread out flat."); render(); };
+      el("b5").onclick = () => {
+        iodine = true; render();
+        if (!boiled) { say("It stays orange-brown: the iodine could not get through the cell membranes. Boil first."); return; }
+        if (!ethanol) { api.found("hidden"); say("The leaf is too green to tell — the chlorophyll hides the colour change. Take the green out with ethanol first."); return; }
+        const crack = soft ? "" : " (It cracked when you spread it — warm water would have softened it.)";
+        if (leaf === "light") { api.found("pattern"); say("Blue-black where the leaf was green: starch. Orange-brown where it was white: no chlorophyll, so no photosynthesis." + crack); }
+        else { api.found("destarch"); say("All orange-brown — no starch anywhere. In the dark it could not photosynthesise, and it used up its store." + crack); }
+      };
+      (function loop() {
+        if (!alive(r)) return;
+        if (fire > 0) fire -= 0.016;
+        el("fire").innerHTML = fire > 0 ? [0, 1, 2].map(i => `<path d="M${60 + i * 12} 60 Q${66 + i * 12} ${10 - Math.random() * 20} ${72 + i * 12} 60 Z" fill="${i % 2 ? "#f2b705" : "#e0592a"}"/>`).join("") : "";
+        requestAnimationFrame(loop);
+      })();
+      render();
+    }
+
+    // ── hydrogencarbonate indicator ────────────────────────────────────────
+    function indBench() {
+      const MIX = [["none", "Nothing"], ["plant", "🌿 Water plant"], ["mag", "🐛 Maggots"], ["both", "🌿🐛 Both"]];
+      let mix = "plant", light = true, co2 = 0.5, t = 0, going = false, rack = [];
+      const r = shell(`<div class="ctrl"><label>In the tube:</label>${MIX.map(([k, n]) => `<button data-mix="${k}" class="${k === mix ? "on" : ""}">${n}</button>`).join("")}</div>
+        ${pickRow("lt", [["on", "☀️ In the light"], ["off", "🌑 In the dark"]], "on")}
+        <svg viewBox="0 0 400 200" role="img" aria-label="A test tube of hydrogencarbonate indicator, and a rack of earlier results">
+          <rect id="bg" x="0" y="0" width="140" height="200" fill="#fff8d6"/>
+          <rect x="50" y="20" width="40" height="150" rx="18" fill="#fff" stroke="#7f8c99" stroke-width="3"/>
+          <rect id="liq" x="53" y="60" width="34" height="107" rx="15" fill="#c0392b"/>
+          <line x1="52" y1="100" x2="88" y2="100" stroke="#7f8c99" stroke-width="3"/><g id="who"></g>
+          <text x="70" y="192" text-anchor="middle" font-size="12" fill="#5b6675" id="clock">0 min</text>
+          <g transform="translate(160 20)"><rect x="0" y="0" width="230" height="16" rx="8" fill="url(#ramp)"/>
+            <text x="0" y="30" font-size="11" fill="#5b6675">purple: none</text><text x="115" y="30" text-anchor="middle" font-size="11" fill="#5b6675">red: a little</text><text x="230" y="30" text-anchor="end" font-size="11" fill="#5b6675">yellow: lots</text>
+            <path id="ptr" d="M0 -2 l-5 -8 h10 Z" fill="#34495e"/></g>
+          <defs><linearGradient id="ramp"><stop offset="0" stop-color="#7b3fa0"/><stop offset=".5" stop-color="#c0392b"/><stop offset="1" stop-color="#f2c12e"/></linearGradient></defs>
+          <g id="rack" transform="translate(160 70)"></g>
+        </svg>
+        <div class="ctrl"><button id="go">▶ Leave it for 30 minutes</button></div>
+        <p class="muted" id="msg">The indicator starts red. It shows how much carbon dioxide is in the water.</p>`);
+      const colour = c => {       // purple → red → yellow as carbon dioxide rises
+        const mixc = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
+        const P = [123, 63, 160], R = [192, 57, 43], Y = [242, 193, 46];
+        const [x, y, z] = c < 0.5 ? mixc(P, R, c / 0.5) : mixc(R, Y, (c - 0.5) / 0.5);
+        return `rgb(${x},${y},${z})`;
+      };
+      const change = () => {       // carbon dioxide change per minute
+        const plant = mix === "plant" || mix === "both", mag = mix === "mag" || mix === "both";
+        return (plant ? 0.012 : 0) + (mag ? 0.02 : 0) - (plant && light ? 0.04 : 0);
+      };
+      const reset = () => { co2 = 0.5; t = 0; going = false; };
+      root.querySelectorAll("[data-mix]").forEach(b => b.onclick = () => { root.querySelectorAll("[data-mix]").forEach(x => x.classList.toggle("on", x === b)); mix = b.dataset.mix; reset(); });
+      wirePick("lt", v => { light = v === "on"; reset(); });
+      el("go").onclick = () => { reset(); going = true; };
+      function finish() {
+        going = false;
+        const c = co2, name = MIX.find(m => m[0] === mix)[1] + (light ? " · light" : " · dark");
+        rack = rack.filter(x => x[0] !== name).concat([[name, c]]).slice(-6);
+        if (c > 0.8) api.found("yellow");
+        if (c < 0.2) api.found("purple");
+        if (mix === "plant" && !light) { api.found("plantdark"); say("Yellow — in the dark the plant only respires, so it adds carbon dioxide. Plants respire all the time, just like animals."); }
+        else if (mix === "mag" && light) { api.found("maggotlight"); say("Still yellow. Maggots cannot photosynthesise — light makes no difference to them."); }
+        else if (mix === "none") { api.found("control"); say("Still red. Nothing living, nothing changes — this is the control that the other tubes are compared with."); }
+        else if (mix === "both" && light) say("Purple or red: the plant uses up the carbon dioxide from both itself and the maggots.");
+        else if (mix === "plant" && light) say("Purple — photosynthesis in the light uses carbon dioxide faster than respiration makes it.");
+        else say("Yellow — respiration only, so carbon dioxide builds up.");
+      }
+      (function loop() {
+        if (!alive(r)) return;
+        if (going) { t += 0.2; co2 = Math.max(0, Math.min(1, co2 + change() * 0.2)); if (t >= 30) finish(); }
+        el("liq").setAttribute("fill", colour(co2));
+        el("bg").setAttribute("fill", light ? "#fff8d6" : "#2c3440");
+        el("clock").textContent = Math.round(t) + " min";
+        el("clock").setAttribute("fill", light ? "#5b6675" : "#dfe6ee");
+        el("ptr").setAttribute("transform", `translate(${230 * co2} 0)`);
+        el("who").innerHTML = (mix === "plant" || mix === "both" ? `<path d="M70 165 q-8 -20 0 -40 q8 -15 0 -22" stroke="#2e8b57" stroke-width="4" fill="none"/>` : "")
+          + (mix === "mag" || mix === "both" ? `<text x="62" y="92" font-size="16">🐛</text>` : "");
+        el("rack").innerHTML = rack.map(([n, c], i) => `<g transform="translate(0 ${i * 20})"><rect width="26" height="14" rx="6" fill="${colour(c)}"/><text x="34" y="12" font-size="12" fill="#5b6675">${n}</text></g>`).join("");
+        requestAnimationFrame(loop);
+      })();
+    }
+
+    // ── one carbon atom ────────────────────────────────────────────────────
+    function cycleBench() {
+      const STORES = { air: [200, 40, "☁️ Air (carbon dioxide)"], plant: [70, 140, "🌳 Plant"], animal: [200, 150, "🐄 Animal"],
+        dead: [300, 200, "🍂 Dead remains"], fuel: [330, 270, "⛽ Fossil fuel"] };
+      const MOVES = {
+        air: [["photo", "Photosynthesis", "plant", "A plant took in carbon dioxide and used light energy to make glucose. The carbon is now in the plant."]],
+        plant: [["resp", "Respiration", "air", "The plant broke down glucose — carbon dioxide back into the air. Plants respire all the time."],
+          ["feed", "Feeding", "animal", "An animal ate the plant. The carbon is now part of the animal."],
+          ["die", "The plant dies", "dead", "The plant died. Its carbon is in the dead leaves and wood."],
+          ["burn", "Combustion (burning wood)", "air", "Burning — the carbon joins with oxygen to make carbon dioxide."]],
+        animal: [["resp", "Respiration", "air", "The animal respired — carbon dioxide breathed out into the air."],
+          ["die", "The animal dies", "dead", "The animal died. Its carbon is in its body and its waste."]],
+        dead: [["decomp", "Decomposition", "air", "Decomposers — bacteria and fungi — broke down the remains and respired. Carbon dioxide into the air."],
+          ["fossil", "Buried with no oxygen", "fuel", "Buried where there is no oxygen, so nothing rots it. Heat and pressure over MILLIONS of years made a fossil fuel."]],
+        fuel: [["burn", "Combustion (burning fuel)", "air", "Burning the fossil fuel releases carbon that was locked away for millions of years."]],
+      };
+      let at = "air", anim = null, loops = 0, years = 0;
+      const r = shell(`<svg viewBox="0 0 400 300" role="img" aria-label="The carbon cycle with one carbon atom to move">
+          <rect x="0" y="232" width="400" height="68" fill="#8a6a4a" opacity=".35"/>
+          ${Object.entries(STORES).map(([k, [x, y, n]]) => `<g><rect x="${x - 58}" y="${y - 16}" width="116" height="32" rx="16" fill="#fff" stroke="#c9d2db" stroke-width="2" id="st-${k}"/>
+            <text x="${x}" y="${y + 5}" text-anchor="middle" font-size="12" fill="#34495e">${n}</text></g>`).join("")}
+          <circle id="atom" r="11" fill="#34495e" stroke="#fff" stroke-width="3"/><text id="atomC" font-size="11" fill="#fff" text-anchor="middle">C</text>
+        </svg>
+        <div class="ctrl" id="moves"></div>
+        <div class="readout"><span class="chip" id="yrs">time: 0 years</span><span class="chip" id="lp">back to the air: 0 times</span></div>
+        <p class="muted" id="msg">You are one carbon atom in the air. Where next?</p>`);
+      function buttons() {
+        el("moves").innerHTML = MOVES[at].map(([k, n], i) => `<button data-mv="${i}">${n} →</button>`).join("");
+        root.querySelectorAll("[data-mv]").forEach(b => b.onclick = () => go(MOVES[at][+b.dataset.mv]));
+        Object.keys(STORES).forEach(k => el("st-" + k).setAttribute("stroke", k === at ? "#2f6f9f" : "#c9d2db"));
+      }
+      function go([k, , to, text]) {
+        if (anim) return;
+        anim = { from: STORES[at], to: STORES[to], t: 0 };
+        years += k === "fossil" ? 100e6 : k === "burn" && at === "fuel" ? 0 : 1;
+        at = to;
+        if (["photo", "feed", "decomp", "fossil", "burn"].includes(k)) api.found(k);
+        if (to === "air") { loops++; if (loops >= 5) api.found("loop"); }
+        say(text); buttons();
+      }
+      (function loop() {
+        if (!alive(r)) return;
+        let x, y;
+        if (anim) {
+          anim.t = Math.min(1, anim.t + 0.03);
+          const e = anim.t * anim.t * (3 - 2 * anim.t);
+          x = anim.from[0] + (anim.to[0] - anim.from[0]) * e; y = anim.from[1] + (anim.to[1] - anim.from[1]) * e - Math.sin(anim.t * Math.PI) * 30;
+          if (anim.t >= 1) anim = null;
+        } else { x = STORES[at][0] + 44; y = STORES[at][1] - 14; }
+        el("atom").setAttribute("cx", x); el("atom").setAttribute("cy", y);
+        el("atomC").setAttribute("x", x); el("atomC").setAttribute("y", y + 4);
+        el("yrs").textContent = "time: " + (years >= 1e6 ? `about ${Math.round(years / 1e6)} million years` : `${years} year${years === 1 ? "" : "s"}`);
+        el("lp").textContent = `back to the air: ${loops} time${loops === 1 ? "" : "s"}`;
+        requestAnimationFrame(loop);
+      })();
+      buttons();
+    }
+
+    // ── the planet ─────────────────────────────────────────────────────────
+    // A toy thermostat, not a climate model: carbon dioxide rises with fuel burned, forests pull it
+    // back, and the temperature follows the carbon dioxide. Sea level follows the temperature.
+    function planetBench() {
+      let fuel = 3, forest = 6, co2 = 280, peak = 280, dust = 0, hit = 0;
+      const r = shell(`<svg viewBox="0 0 400 220" role="img" aria-label="A coast with houses, ice and forest, and a thermometer">
+          <rect id="sky" x="0" y="0" width="400" height="220" fill="#cfe7fb"/><circle id="sun" cx="340" cy="36" r="20" fill="#f2b705"/>
+          <rect id="sea" x="0" y="150" width="150" height="70" fill="#4a90d9" opacity=".75"/>
+          <path id="ice" d="" fill="#fff" stroke="#b9d3e8"/>
+          <path d="M150 150 L400 150 L400 220 L150 220 Z" fill="#9bc37a"/><g id="trees"></g>
+          <text x="210" y="148" font-size="22">🏠</text><text x="250" y="148" font-size="22">🏠</text><text x="300" y="148" font-size="22">🏭</text>
+          <rect id="flood" x="150" y="150" width="250" height="0" fill="#4a90d9" opacity=".75"/>
+          <g id="smoke"></g><g id="rock"></g>
+          <rect x="376" y="60" width="12" height="120" rx="6" fill="#fff" stroke="#7f8c99"/><rect id="therm" x="378" y="120" width="8" height="58" fill="#c0392b"/>
+          <text x="200" y="210" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold" id="tt"></text>
+        </svg>
+        <div class="ctrl slider"><label for="fu">Fossil fuel burned</label><input type="range" id="fu" min="0" max="10" value="3"></div>
+        <div class="ctrl slider"><label for="fo">Forests</label><input type="range" id="fo" min="0" max="10" value="6"></div>
+        <div class="readout"><span class="chip" id="c2"></span><span class="chip" id="tp"></span><span class="chip" id="sl"></span></div>
+        <div class="ctrl"><button id="ast">☄️ 66 million years ago…</button><button id="rs">↺ Start again</button></div>
+        <p class="muted" id="msg">Carbon dioxide traps heat. Burn more, or plant more, and watch.</p>`);
+      el("fu").oninput = () => { fuel = +el("fu").value; };
+      el("fo").oninput = () => { forest = +el("fo").value; };
+      el("rs").onclick = () => { co2 = peak = 280; dust = hit = 0; say("Back to 280 parts per million — the air before people burned coal and oil."); };
+      el("ast").onclick = () => {
+        if (hit) return; hit = 1; dust = 1; api.found("asteroid");
+        say("An asteroid hits the coast of Mexico. Dust blocks the sunlight, so plants cannot photosynthesise and animals lose their food. Less heat reaches the ground, so it gets much colder. Up to three-quarters of all species die out — including the dinosaurs. (No people: there were none yet.)");
+      };
+      (function loop() {
+        if (!alive(r)) return;
+        co2 = Math.max(200, co2 + (fuel * 0.9 - forest * 0.35 - (co2 - 280) * 0.004) * 0.05);
+        peak = Math.max(peak, co2);
+        if (peak > 450 && co2 < 350) api.found("cool");
+        const temp = 14 + 3 * Math.log2(co2 / 280) - dust * 8;
+        if (temp >= 16) api.found("warm");
+        if (hit) { hit += 0.004; dust = Math.max(0, 1 - (hit - 1) * 0.35); }
+        const rise = Math.max(-10, Math.min(40, (temp - 14) * 9));
+        el("sea").setAttribute("y", 150 - rise); el("sea").setAttribute("height", 70 + rise);
+        el("flood").setAttribute("y", 150 - Math.max(0, rise)); el("flood").setAttribute("height", Math.max(0, rise));
+        const iceW = Math.max(0, Math.min(150, 80 - (temp - 14) * 30));
+        el("ice").setAttribute("d", `M0 150 L${iceW} 150 L${iceW * 0.7} 110 L0 100 Z`);
+        el("trees").innerHTML = Array.from({ length: forest }, (_, i) => `<text x="${160 + i * 20}" y="${170 + (i % 2) * 14}" font-size="16"${dust > 0.3 ? ' opacity=".35"' : ""}>🌲</text>`).join("");
+        el("smoke").innerHTML = Array.from({ length: fuel }, (_, i) => `<circle cx="${310 + Math.sin(i * 1.7 + performance.now() / 700) * 8}" cy="${120 - i * 10}" r="${5 + i}" fill="#7f8c99" opacity=".35"/>`).join("");
+        el("sky").setAttribute("fill", dust > 0.05 ? `rgb(${Math.round(207 - 140 * dust)},${Math.round(231 - 150 * dust)},${Math.round(251 - 170 * dust)})` : "#cfe7fb");
+        el("sun").setAttribute("opacity", 1 - dust * 0.85);
+        el("rock").innerHTML = hit && hit < 1.2 ? `<text x="${60 + (hit - 1) * 700}" y="${(hit - 1) * 700}" font-size="26">☄️</text>` : dust > 0.3 ? `<text x="170" y="120" font-size="28">🦕</text>` : "";
+        el("therm").setAttribute("y", 178 - Math.max(4, Math.min(116, (temp - 4) * 5.8))); el("therm").setAttribute("height", Math.max(4, Math.min(116, (temp - 4) * 5.8)));
+        el("c2").textContent = `carbon dioxide ${Math.round(co2)} ppm`;
+        el("tp").textContent = `mean temperature ${temp.toFixed(1)} °C`;
+        el("sl").textContent = rise > 20 ? "sea level: flooding!" : rise > 5 ? "sea level rising" : rise < -3 ? "sea level falling" : "sea level steady";
+        el("tt").textContent = rise > 20 ? "the houses are flooding" : dust > 0.3 ? "dark and cold — no photosynthesis" : "";
+        requestAnimationFrame(loop);
+      })();
+    }
+
+    draw();
   },
 });
 
