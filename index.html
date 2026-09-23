@@ -1437,14 +1437,16 @@ ARCADE.toy({
     ["clear", "Room air is different", "Pump ordinary air through the other tube"],
   ],
   mount(root, api) {
-    let tab = "jar", stop = false, frame = 0;
-    const alive = () => !stop && document.body.contains(root);
+    let tab = "jar", run = 0;
+    const alive = r => r === run && document.body.contains(root);
     const tabs = [["jar", "🔔 Bell jar"], ["run", "🏃 The runner"], ["sac", "🔬 Air sac"], ["lime", "🧪 Limewater"]];
 
     function shell(inner) {
-      root.innerHTML = `<div class="ctrl">${tabs.map(([k, n]) =>
+      run++;
+      root.innerHTML = `<div class="ctrl tabs">${tabs.map(([k, n]) =>
         `<button data-tab="${k}" class="${k === tab ? "on" : ""}">${n}</button>`).join("")}</div><div id="bench">${inner}</div>`;
-      root.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { stop = true; tab = b.dataset.tab; stop = false; draw(); });
+      root.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { tab = b.dataset.tab; draw(); });
+      return run;
     }
     const bench = () => document.getElementById("bench");
     function draw() { ({ jar: jarBench, run: runBench, sac: sacBench, lime: limeBench })[tab](); }
@@ -1452,47 +1454,61 @@ ARCADE.toy({
     // ── the bell jar ────────────────────────────────────────────────────────
     function jarBench() {
       let v = 0, target = 0, breaths = 0, wasIn = false, top = false;
-      shell(`<svg viewBox="0 0 400 300" id="jar" role="img" aria-label="A bell jar model of the lungs">
-          <text x="200" y="16" text-anchor="middle" font-size="15" id="flow">tap a button, or drag the blue handle</text>
-          <rect x="192" y="20" width="16" height="48" fill="#b9c6d4"/>
-          <path d="M200 66 L166 116 M200 66 L234 116" stroke="#b9c6d4" stroke-width="11" fill="none"/>
-          <path d="M96 232 L96 90 Q96 62 124 62 L276 62 Q304 62 304 90 L304 232 Z" fill="none" stroke="#7f8c99" stroke-width="5"/>
-          <ellipse id="lungL" cx="166" cy="140" rx="30" ry="34" fill="#e8737d"/>
-          <ellipse id="lungR" cx="234" cy="140" rx="30" ry="34" fill="#e8737d"/>
-          <text x="6" y="192" font-size="13" fill="#7b5ea7">rubber sheet</text>
-          <text x="6" y="208" font-size="13" fill="#7b5ea7">= your diaphragm</text>
-          <path id="sheet" d="" fill="none" stroke="#7b5ea7" stroke-width="9" stroke-linecap="round"/>
-          <circle id="knob" r="17" cx="200" cy="232" fill="#2f6f9f" stroke="#fff" stroke-width="3" class="grab"/>
-          <text x="200" y="276" text-anchor="middle" font-size="15" id="press">drag me down</text>
-        </svg>
+      // A real bell jar: open at the bottom, closed by the rubber sheet, with a glass Y-tube through
+      // the stopper and a balloon on each branch. The handle hangs from the middle of the sheet.
+      const tag = (y, a, b, x1, x2) => `<text x="238" y="${y}" font-size="14" font-weight="bold">${a}</text>
+          <text x="238" y="${y + 16}" font-size="13" class="lbl">${b}</text>
+          <path d="M${x1} ${y + 3} H${x2}" stroke="#9aa6b3" stroke-width="1.5"/>`;
+      const r = shell(`<svg class="scene" viewBox="0 0 300 282" id="jar" role="img" aria-label="A bell jar model of the lungs" style="touch-action:none;max-width:440px"><g transform="translate(-50 0)">
+          <path d="M60 222 L60 112 Q62 70 122 64 L122 48 L158 48 L158 64 Q218 70 220 112 L220 222 Z" fill="#9fc6e0" opacity=".14"/>
+          <path d="M60 222 L60 112 Q62 70 122 64 L122 48 M158 48 L158 64 Q218 70 220 112 L220 222" fill="none" stroke="#7f8c99" stroke-width="5" stroke-linejoin="round"/>
+          <rect x="135" y="4" width="10" height="96" fill="#b9c6d4"/>
+          <rect x="116" y="34" width="48" height="16" rx="3" fill="#8a6d4b"/>
+          <path d="M140 98 L110 124 M140 98 L170 124" stroke="#b9c6d4" stroke-width="8" fill="none" stroke-linecap="round"/>
+          <ellipse id="lungL" cx="106" cy="152" rx="16" ry="20" fill="#e8737d"/>
+          <ellipse id="lungR" cx="174" cy="152" rx="16" ry="20" fill="#e8737d"/>
+          <path id="stick" d="" stroke="#2f6f9f" stroke-width="5"/>
+          <path id="sheet" d="" fill="none" stroke="#7b5ea7" stroke-width="8" stroke-linecap="round"/>
+          <circle id="knob" r="14" cx="140" cy="235" fill="#2f6f9f" stroke="#fff" stroke-width="3" class="grab"/>
+          <text x="128" y="20" text-anchor="end" font-size="14" font-weight="bold" id="flow"></text>
+          ${tag(16, "glass tube", "= windpipe", 150, 232)}
+          ${tag(80, "bell jar", "= chest", 212, 232)}
+          ${tag(146, "balloons", "= lungs", 206, 232)}
+          ${tag(214, "rubber sheet", "= diaphragm", 222, 232)}
+        </g></svg>
+        <p class="muted" id="press" style="text-align:center">Drag the blue handle down, or use the buttons.</p>
         <div class="ctrl"><button id="pull">⬇ Pull down (breathe in)</button><button id="push">⬆ Push up (breathe out)</button>
           <span class="chip" id="count">0 breaths</span></div>`);
       const svg = document.getElementById("jar");
       const el = id => document.getElementById(id);
       function render() {
-        el("lungL").setAttribute("rx", 22 + 16 * v); el("lungR").setAttribute("rx", 22 + 16 * v);
-        el("lungL").setAttribute("ry", 26 + 22 * v); el("lungR").setAttribute("ry", 26 + 22 * v);
-        const dip = 196 + 46 * v;
-        el("sheet").setAttribute("d", `M96 196 Q200 ${dip} 304 196`);
-        el("knob").setAttribute("cy", 210 + 44 * v);
-        el("press").textContent = v > 0.55 ? "space is BIGGER · pressure LOW" : v < 0.2 ? "space is smaller · pressure HIGH" : "";
+        el("lungL").setAttribute("rx", 16 + 12 * v); el("lungR").setAttribute("rx", 16 + 12 * v);
+        el("lungL").setAttribute("ry", 20 + 16 * v); el("lungR").setAttribute("ry", 20 + 16 * v);
+        const mid = 213 + 28 * v;                                   // the middle of the sheet
+        el("sheet").setAttribute("d", `M60 222 Q140 ${2 * mid - 222} 220 222`);
+        el("stick").setAttribute("d", `M140 ${mid} V${mid + 22}`);
+        el("knob").setAttribute("cy", mid + 22);
+        if (v > 0.55) el("press").textContent = "More space inside the jar, so the pressure is lower. Air rushes in.";
+        else if (v < 0.2 && breaths) el("press").textContent = "Less space inside the jar, so the pressure is higher. Air is pushed out.";
+        else if (breaths || v > 0.2) el("press").textContent = "";
       }
       function setV(nv) {
         nv = Math.max(0, Math.min(1, nv));
-        const d = nv - v; v = nv; render();
-        if (d > 0.01) { el("flow").textContent = "⬇ air rushes IN"; wasIn = true; }
-        else if (d < -0.01) { el("flow").textContent = "⬆ air pushes OUT"; if (wasIn) { wasIn = false; breaths++; el("count").textContent = breaths + " breaths"; if (breaths >= 10) api.found("ten"); } }
+        const d = nv - v; v = nv;
+        if (d > 0.01) { el("flow").textContent = "air in ⬇"; wasIn = true; }
+        else if (d < -0.01) { el("flow").textContent = "air out ⬆"; if (wasIn) { wasIn = false; breaths++; el("count").textContent = breaths + (breaths === 1 ? " breath" : " breaths"); if (breaths >= 10) api.found("ten"); } }
+        render();
         if (d > 0.01) api.found("in");
         if (d < -0.01) api.found("out");
         if (v > 0.94 && !top) { top = true; api.found("deep"); }
       }
       // Drag the knob, or use the buttons — either works, and neither can be done wrongly.
       let dragging = false;
-      const yOf = e => { const r = svg.getBoundingClientRect(); return (e.clientY - r.top) / r.height * 300; };
+      const yOf = e => { const b = svg.getBoundingClientRect(); return (e.clientY - b.top) / b.height * 282; };
       el("knob").addEventListener("pointerdown", e => { dragging = true; el("knob").setPointerCapture(e.pointerId); });
-      svg.addEventListener("pointermove", e => { if (dragging) { e.preventDefault(); setV((yOf(e) - 210) / 44); } });
+      svg.addEventListener("pointermove", e => { if (dragging) { e.preventDefault(); setV((yOf(e) - 235) / 28); } });
       addEventListener("pointerup", () => { dragging = false; });
-      const glide = to => { target = to; (function step() { if (!alive() || dragging || tab !== "jar" || !el("lungL")) return; const d = target - v; if (Math.abs(d) < 0.02) { setV(target); return; } setV(v + d * 0.18); requestAnimationFrame(step); })(); };
+      const glide = to => { target = to; (function step() { if (!alive(r) || dragging) return; const d = target - v; if (Math.abs(d) < 0.02) { setV(target); return; } setV(v + d * 0.18); requestAnimationFrame(step); })(); };
       el("pull").onclick = () => glide(1); el("push").onclick = () => glide(0);
       render();
     }
@@ -1501,20 +1517,19 @@ ARCADE.toy({
     function runBench() {
       const SPEEDS = [["Resting", 14, 0.4], ["Walking", 22, 1], ["Jogging", 36, 1.8], ["Sprinting", 58, 3]];
       let si = 0, rate = 14, o2 = 80, phase = 0, sprintOk = 0, overFast = 0, down = false;
-      shell(`<svg viewBox="0 0 400 250" role="img" aria-label="A runner and an oxygen meter">
-          <line x1="0" y1="232" x2="400" y2="232" stroke="#9aa6b3" stroke-width="4"/>
-          <g id="runner"><circle cx="0" cy="-64" r="13" fill="#34495e"/>
-            <path id="body" d="M0 -51 L0 -18" stroke="#34495e" stroke-width="9" stroke-linecap="round"/>
-            <path id="legs" d="" stroke="#34495e" stroke-width="9" fill="none" stroke-linecap="round"/>
-            <path id="arms" d="" stroke="#34495e" stroke-width="7" fill="none" stroke-linecap="round"/>
-            <ellipse id="chest" cx="0" cy="-38" rx="12" ry="9" fill="#e8737d" opacity=".9"/>
-            <text id="puff" x="24" y="-66" font-size="18"></text></g>
-          <text x="10" y="26" font-size="15" id="need">Resting needs about 14 breaths a minute</text>
-          <rect x="10" y="36" width="380" height="22" rx="11" fill="#e2ddd2"/>
-          <rect x="10" y="36" width="304" height="22" rx="11" fill="#2e8b57" id="bar"/>
-          <text x="200" y="52" text-anchor="middle" font-size="14" fill="#fff" id="o2t">oxygen 80%</text>
+      const r = shell(`<p class="jobline" id="need">Resting needs about 14 breaths a minute</p>
+        <div class="readout" style="align-items:center"><span class="muted">Oxygen in his blood</span>
+          <div class="progress" style="flex:1 1 160px;height:20px"><i id="bar" style="width:80%"></i></div><span class="chip" id="o2t">80%</span></div>
+        <svg class="scene" viewBox="0 0 400 150" role="img" aria-label="A runner on a track">
+          <line x1="0" y1="140" x2="400" y2="140" class="edge" stroke-width="4"/>
+          <g id="runner" style="color:var(--ink)"><circle cx="0" cy="-66" r="9" fill="currentColor"/>
+            <path d="M0 -57 L0 -26" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
+            <path id="legs" d="" stroke="currentColor" stroke-width="7" fill="none" stroke-linecap="round"/>
+            <path id="arms" d="" stroke="currentColor" stroke-width="5" fill="none" stroke-linecap="round"/>
+            <ellipse id="lungA" cx="-4" cy="-44" rx="3.5" ry="6" fill="#e8737d"/><ellipse id="lungB" cx="4" cy="-44" rx="3.5" ry="6" fill="#e8737d"/></g>
+          <text id="puff" font-size="22"></text>
         </svg>
-        <div class="ctrl">${SPEEDS.map((s, i) => `<button data-sp="${i}" class="${i === 0 ? "on" : ""}">${s[0]}</button>`).join("")}</div>
+        <div class="ctrl pick"><span class="lead">Pace</span>${SPEEDS.map((s, i) => `<button data-sp="${i}" class="${i === 0 ? "on" : ""}">${s[0]}</button>`).join("")}</div>
         <div class="ctrl slider"><label for="rt">Your breathing rate</label><input type="range" id="rt" min="6" max="75" value="14">
           <span class="chip" id="rtv">14 a minute</span></div>`);
       const el = id => document.getElementById(id);
@@ -1526,7 +1541,7 @@ ARCADE.toy({
       el("rt").oninput = () => { rate = +el("rt").value; el("rtv").textContent = rate + " a minute"; };
       let last = performance.now();
       (function loop(now) {
-        if (!alive() || tab !== "run") return;
+        if (!alive(r)) return;
         const dt = Math.min(0.05, (now - last) / 1000); last = now;
         const [, need, speed] = SPEEDS[si];
         o2 = Math.max(0, Math.min(100, o2 + (rate - need) * dt * 2.2));
@@ -1536,15 +1551,18 @@ ARCADE.toy({
         if (si === 0 && rate > 55) { overFast += dt; if (overFast > 5) api.found("over"); } else overFast = 0;
         phase += dt * (down ? 0 : speed * 7);
         const bounce = down ? 0 : Math.abs(Math.sin(phase)) * 6;
-        el("runner").setAttribute("transform", `translate(${down ? 120 : 60 + ((phase * 14) % 280)} ${232 - bounce}) scale(${down ? "1.5 1.05" : "1.5"})`);
-        const k = Math.sin(phase) * 16, j = Math.cos(phase) * 14;
+        const rx = 30 + ((phase * 14) % 330);
+        el("runner").setAttribute("transform", down ? "translate(150 131) rotate(90) scale(1.4)" : `translate(${rx} ${140 - bounce}) scale(1.4)`);
+        el("puff").setAttribute("x", down ? 262 : rx + 18); el("puff").setAttribute("y", down ? 116 : 52 - bounce);
+        const k = down ? 2 : Math.sin(phase) * 16, j = down ? 3 : Math.cos(phase) * 14;
         el("legs").setAttribute("d", `M0 -18 L${k} 0 M0 -18 L${-k} 0`);
         el("arms").setAttribute("d", `M0 -44 L${j} -26 M0 -44 L${-j} -26`);
-        el("chest").setAttribute("ry", 7 + 4 * Math.abs(Math.sin(now / 1000 * rate / 60 * Math.PI)));
+        const puff = 4 + 3 * Math.abs(Math.sin(now / 1000 * rate / 60 * Math.PI));
+        el("lungA").setAttribute("ry", puff); el("lungB").setAttribute("ry", puff);
         el("puff").textContent = down ? "😵" : o2 < 25 ? "😮‍💨" : rate > need + 28 ? "😵‍💫" : o2 > 60 ? "😄" : "🙂";
-        el("bar").setAttribute("width", Math.max(2, 380 * o2 / 100));
-        el("bar").setAttribute("fill", o2 < 25 ? "#b4531f" : o2 < 55 ? "#d99a00" : "#2e8b57");
-        el("o2t").textContent = down ? "out of oxygen — he has to stop!" : `oxygen ${Math.round(o2)}%`;
+        el("bar").style.width = o2 + "%";
+        el("bar").style.background = o2 < 25 ? "var(--warn)" : o2 < 55 ? "var(--gold)" : "var(--good)";
+        el("o2t").textContent = down ? "0% — he has to stop!" : Math.round(o2) + "%";
         requestAnimationFrame(loop);
       })(performance.now());
     }
@@ -1555,19 +1573,24 @@ ARCADE.toy({
     // more oxygen wanders down than up — the student only controls what keeps that difference going
     // (breathing and blood flow). Stop both and the two sides even out, which is the lesson.
     function sacBench() {
-      const X0 = 44, X1 = 356, SAC = [24, 106], BLOOD = [154, 236], CROSS = 0.6;
+      const X0 = 28, X1 = 232, SAC = [28, 108], BLOOD = [140, 220], CROSS = 0.6;
       let parts = [], flowing = true, crossed = 0, carried = 0, lastAct = performance.now(), last = performance.now(), spawn = 0;
       const dot = (kind, side) => { const [a, b] = side === "sac" ? SAC : BLOOD;
         return { kind, side, x: X0 + Math.random() * (X1 - X0), y: a + Math.random() * (b - a), h: Math.random() * 6.3 }; };
       for (let i = 0; i < 20; i++) parts.push(dot("o2", "sac"));
       for (let i = 0; i < 16; i++) parts.push(dot("co2", "blood"));
-      shell(`<p class="muted">Oxygen (red) and carbon dioxide (grey) wander about on their own. Watch which way more of them drift through the thin wall. You are in charge of breathing and the blood.</p>
-        <svg viewBox="0 0 400 262" id="sac" role="img" aria-label="An air sac above a blood vessel, with gas particles moving between them">
-          <rect x="36" y="16" width="328" height="98" rx="20" fill="#dff0fb" stroke="#9fc6e0" stroke-width="3"/>
-          <text x="200" y="14" text-anchor="middle" font-size="13" fill="#5b6675">inside the air sac</text>
-          <rect x="36" y="146" width="328" height="98" rx="20" fill="#fbe3e6" stroke="#e0a6ad" stroke-width="3"/>
-          <text x="200" y="258" text-anchor="middle" font-size="13" fill="#5b6675" id="bloodlab">blood vessel — blood flowing →</text>
-          <text x="200" y="134" text-anchor="middle" font-size="12" fill="#9aa6b3">thin wall — one cell thick</text>
+      const r = shell(`<p class="muted"><span class="swatch" style="background:#e8555f;border-radius:50%"></span>Oxygen and <span class="swatch" style="background:#8d97a3;border-radius:50%"></span>carbon dioxide wander about on their own. Watch which way more of them drift through the thin wall. You are in charge of breathing and the blood.</p>
+        <svg class="scene" viewBox="0 0 360 240" style="max-width:480px" id="sac" role="img" aria-label="An air sac above a blood capillary, with gas particles moving between them">
+          <rect x="20" y="18" width="220" height="104" rx="18" fill="#dff0fb" stroke="#9fc6e0" stroke-width="3"/>
+          <rect x="20" y="126" width="220" height="104" rx="18" fill="#fbe3e6" stroke="#e0a6ad" stroke-width="3"/>
+          ${Array.from({ length: 10 }, (_, i) => `<rect x="${20 + i * 22}" y="116" width="22" height="12" rx="5" fill="#f6d7c3" stroke="#d9a98c" stroke-width="1.5"/><ellipse cx="${31 + i * 22}" cy="122" rx="4" ry="2.5" fill="#b07a5a"/>`).join("")}
+          <text x="250" y="64" font-size="15" font-weight="bold">air sac</text>
+          <text x="250" y="82" font-size="14" class="lbl">(alveolus)</text>
+          <text x="250" y="118" font-size="15" font-weight="bold">thin wall</text>
+          <text x="250" y="136" font-size="14" class="lbl">one cell thick</text>
+          <text x="250" y="176" font-size="15" font-weight="bold">blood</text>
+          <text x="250" y="194" font-size="14" class="lbl">capillary</text>
+          <text x="250" y="212" font-size="14" class="lbl" id="bloodlab">flowing →</text>
           <g id="gases"></g>
         </svg>
         <div class="readout"><span class="chip" id="cs">air sac: 20 O₂ · 0 CO₂</span><span class="chip" id="cb">blood: 0 O₂ · 16 CO₂</span><span class="chip" id="cd">oxygen sent to the body: 0</span></div>
@@ -1587,10 +1610,10 @@ ARCADE.toy({
         flowing = !flowing; lastAct = performance.now();
         el("flow").classList.toggle("on", flowing);
         el("flow").textContent = flowing ? "🩸 Blood flowing" : "✋ Blood stopped";
-        el("bloodlab").textContent = flowing ? "blood vessel — blood flowing →" : "blood vessel — blood stopped";
+        el("bloodlab").textContent = flowing ? "flowing →" : "stopped";
       };
       (function loop(now) {
-        if (!alive() || tab !== "sac") return;
+        if (!alive(r)) return;
         const dt = Math.min(0.05, (now - last) / 1000); last = now;
         const calm = api.calm(), speed = calm ? 45 : 90;
         for (const p of parts) {
@@ -1633,15 +1656,19 @@ ARCADE.toy({
     // ── limewater ───────────────────────────────────────────────────────────
     function limeBench() {
       let a = 0, b = 0, hold = null;
-      shell(`<p class="muted">Limewater goes milky when carbon dioxide bubbles through it. Hold a button down — can you still see the X through the tube?</p>
-        <svg viewBox="0 0 400 210" role="img" aria-label="Two test tubes of limewater">
-          ${[["A", 120, "breathed-out air"], ["B", 280, "room air"]].map(([n, x, lab]) => `
-            <rect x="${x - 34}" y="40" width="68" height="140" rx="30" fill="#f7fbff" stroke="#7f8c99" stroke-width="4"/>
-            <path d="M${x - 16} 104 L${x + 16} 160 M${x + 16} 104 L${x - 16} 160" stroke="#34495e" stroke-width="6" stroke-linecap="round"/>
-            <rect x="${x - 30}" y="86" width="60" height="90" rx="26" fill="#cfe6f7" opacity=".35"/>
-            <rect id="liq${n}" x="${x - 30}" y="86" width="60" height="90" rx="26" fill="#f4f1ea" opacity="0"/>
-            <text x="${x}" y="30" text-anchor="middle" font-size="15">Tube ${n}</text>
-            <text x="${x}" y="200" text-anchor="middle" font-size="13" fill="#5b6675">${lab}</text>
+      const r = shell(`<p class="muted">Limewater goes milky when carbon dioxide bubbles through it. Hold a button down — can you still see the X through the tube?</p>
+        <svg class="scene" viewBox="50 0 358 262" style="max-width:480px" role="img" aria-label="Two test tubes of limewater with a card marked X behind each">
+          ${[["A", 120, "breathed-out air", "straw"], ["B", 280, "room air", "pump"]].map(([n, x, lab, feed]) => `
+            <rect x="${x - 44}" y="96" width="88" height="120" rx="6" fill="#ffffff" stroke="#c9d2db" stroke-width="2"/>
+            <path d="M${x - 16} 120 L${x + 16} 170 M${x + 16} 120 L${x - 16} 170" stroke="#34495e" stroke-width="6" stroke-linecap="round"/>
+            <rect x="${x - 22}" y="100" width="44" height="106" rx="20" fill="#cfe6f7" opacity=".35"/>
+            <rect id="liq${n}" x="${x - 22}" y="100" width="44" height="106" rx="20" fill="#f4f1ea" opacity="0"/>
+            <rect x="${x - 26}" y="34" width="52" height="176" rx="24" fill="none" stroke="#7f8c99" stroke-width="4"/>
+            <path d="M${x + 8} 196 V28 Q${x + 8} 14 ${x + 22} 14 H${x + 46}" fill="none" stroke="#9aa6b3" stroke-width="6" stroke-linecap="round"/>
+            ${n === "B" ? `<ellipse cx="${x + 58}" cy="14" rx="14" ry="10" fill="#2f6f9f"/>` : ""}
+            <text x="${x + (n === "B" ? 76 : 52)}" y="19" font-size="14" class="lbl">${feed}</text>
+            <text x="${x}" y="236" text-anchor="middle" font-size="15" font-weight="bold">Tube ${n}</text>
+            <text x="${x}" y="254" text-anchor="middle" font-size="14" class="lbl">${lab}</text>
             <g id="bub${n}"></g>`).join("")}
         </svg>
         <div class="ctrl"><button id="ba">😮‍💨 Hold: breathe out through A</button><button id="bb">💨 Hold: pump room air through B</button></div>`);
@@ -1652,14 +1679,14 @@ ARCADE.toy({
       };
       press(el("ba"), "a"); press(el("bb"), "b");
       (function loop() {
-        if (!alive() || tab !== "lime") return;
+        if (!alive(r)) return;
         if (hold === "a") a = Math.min(1, a + 0.012);
         if (hold === "b") b = Math.min(1, b + 0.012);
         // Tube A goes milky. Tube B never changes — that is the whole point of the control.
         // Milky means you can no longer see through it: the cloud hides the X drawn behind the tube.
         el("liqA").setAttribute("opacity", Math.min(1, 1.1 * a).toFixed(2));
         const bubbles = (n, which) => el("bub" + n).innerHTML = hold === which
-          ? [0, 1, 2].map(i => `<circle cx="${(n === "A" ? 120 : 280) + (i - 1) * 12}" cy="${170 - ((performance.now() / 6 + i * 30) % 80)}" r="5" fill="#cfe6f7"/>`).join("") : "";
+          ? [0, 1, 2].map(i => `<circle cx="${(n === "A" ? 120 : 280) + 8 + (i - 1) * 7}" cy="${196 - ((performance.now() / 6 + i * 30) % 90)}" r="4" fill="#ffffff" stroke="#9fc6e0"/>`).join("") : "";
         bubbles("A", "a"); bubbles("B", "b");
         if (a > 0.75 && api.found("cloudy")) api.say("Tube A has gone milky — you cannot see the X any more. Breathed-out air has lots of carbon dioxide.");
         if (b > 0.5 && api.found("clear")) api.say("Tube B is still clear. Room air has only a tiny bit of carbon dioxide.");
@@ -1710,23 +1737,34 @@ ARCADE.toy({
 
     let solid = "salt", temp = 20, added = 0, dissolved = 0, pouring = false, tried = {}, points = {};
     root.innerHTML = `
-      <div class="ctrl">${Object.entries(SOLIDS).map(([k, s]) => `<button data-solid="${k}" class="${k === "salt" ? "on" : ""}">${s.name}</button>`).join("")}</div>
-      <svg viewBox="0 0 400 268" role="img" aria-label="A beaker of water over a burner, with a graph beside it">
-        <text id="sat" x="120" y="44" text-anchor="middle" font-size="15" fill="#b4531f" font-weight="bold"></text>
-        <path d="M54 58 L54 200 L186 200 L186 58" fill="none" stroke="#7f8c99" stroke-width="4"/>
-        <rect id="water" x="56" y="96" width="128" height="102" fill="#dbeaf6"/>
-        <g id="pile"></g><g id="grains"></g>
-        <line x1="44" y1="208" x2="196" y2="208" stroke="#9aa6b3" stroke-width="5"/>
-        <path id="flame" d="" fill="#f2b705" opacity="0"/>
-        <rect x="114" y="248" width="12" height="16" fill="#8d97a3"/>
-        <rect x="98" y="262" width="44" height="6" rx="3" fill="#8d97a3"/>
-        <rect x="214" y="36" width="172" height="152" fill="none" stroke="#c9d2db" stroke-width="2"/>
-        <text x="300" y="206" text-anchor="middle" font-size="12" fill="#5b6675">temperature →</text>
-        <text x="218" y="196" font-size="11" fill="#5b6675">0</text>
-        <text x="386" y="196" text-anchor="end" font-size="11" fill="#5b6675">100 °C</text>
-        <text x="218" y="32" font-size="11" fill="#5b6675">g per 100 g of water</text>
-        <g id="plot"></g><g id="legend"></g><text id="ymax" x="210" y="44" text-anchor="end" font-size="11" fill="#5b6675"></text>
-      </svg>
+      <div class="ctrl pick"><span class="lead">Solid</span>${Object.entries(SOLIDS).map(([k, s]) => `<button data-solid="${k}" class="${k === "salt" ? "on" : ""}">${s.name}</button>`).join("")}</div>
+      <div class="duo">
+        <svg class="scene" viewBox="0 0 260 270" role="img" aria-label="A beaker of water on a tripod over a burner, with a thermometer in it">
+          <text id="sat" x="110" y="24" text-anchor="middle" font-size="15" fill="#b4531f" font-weight="bold"></text>
+          <rect id="water" x="52" y="80" width="116" height="108" fill="#dbeaf6"/>
+          <g id="pile"></g><g id="grains"></g>
+          <path d="M50 40 L50 190 L170 190 L170 40" fill="none" stroke="#7f8c99" stroke-width="4" stroke-linejoin="round"/>
+          <rect x="146" y="30" width="10" height="150" rx="5" fill="#ffffff" stroke="#9aa6b3" stroke-width="1.5"/>
+          <rect id="merc" x="149" y="120" width="4" height="60" fill="#d64545"/>
+          <circle cx="151" cy="180" r="7" fill="#d64545"/>
+          <path d="M30 196 H190" stroke="#8d97a3" stroke-width="5" stroke-linecap="round"/>
+          <path d="M44 198 L32 262 M176 198 L188 262" stroke="#8d97a3" stroke-width="4" stroke-linecap="round"/>
+          <path id="flame" d="" fill="#f2b705" opacity="0"/>
+          <rect x="104" y="232" width="12" height="24" fill="#8d97a3"/>
+          <rect x="88" y="254" width="44" height="8" rx="3" fill="#8d97a3"/>
+          <text x="186" y="40" font-size="12" class="lbl">thermometer</text><path d="M158 36 H182" stroke="#9aa6b3" stroke-width="1.5"/>
+          <text x="186" y="120" font-size="12" class="lbl">20 g water</text><path d="M170 116 H182" stroke="#9aa6b3" stroke-width="1.5"/>
+          <text x="196" y="200" font-size="12" class="lbl">tripod</text>
+          <text x="140" y="262" font-size="12" class="lbl">burner</text>
+        </svg>
+        <svg class="scene" viewBox="0 0 300 250" role="img" aria-label="A graph of how much dissolves against temperature">
+          <text x="14" y="110" font-size="12" class="lbl" text-anchor="middle" transform="rotate(-90 14 110)">g per 100 g of water</text>
+          <text x="167" y="244" font-size="12" class="lbl" text-anchor="middle">temperature (°C)</text>
+          <g id="axes"></g><g id="plot"></g>
+          <text id="hint" x="167" y="110" font-size="12" class="lbl" text-anchor="middle">saturate a solid to plot a point</text>
+        </svg>
+      </div>
+      <p class="muted" id="legend" style="text-align:center"></p>
       <div class="ctrl"><button id="spoon">🥄 Hold to pour</button><button id="stir">🌀 Stir</button><button id="weigh">⚖️ Weigh it</button><button id="tip">🗑️ Empty the beaker</button></div>
       <div class="ctrl slider"><label for="tp">Temperature</label><input type="range" id="tp" min="10" max="100" value="20"><span class="chip" id="tpv">20 °C</span></div>
       <div class="readout"><span class="chip" id="r1">added 0.0 g</span><span class="chip" id="r2">dissolved 0.0 g</span><span class="chip" id="r3">this water can hold 7.2 g</span><span class="chip" id="r4">the balance reads 20.0 g</span></div>
@@ -1736,7 +1774,7 @@ ARCADE.toy({
     const msg = m => { if (el("msg").textContent !== m) { el("msg").textContent = m; api.say(m); } };
     root.querySelectorAll("[data-solid]").forEach(b => b.onclick = () => {
       root.querySelectorAll("[data-solid]").forEach(x => x.classList.toggle("on", x === b));
-      solid = b.dataset.solid; added = dissolved = 0; tried[solid] = true;
+      solid = b.dataset.solid; added = dissolved = 0; pileAt = null; tried[solid] = true;
       if (Object.keys(tried).length >= 3) api.found("three");
       msg(`${SOLIDS[solid].name} it is. Pour some in.`); render();
     });
@@ -1759,10 +1797,12 @@ ARCADE.toy({
       } else msg(`The balance reads ${mass.toFixed(1)} g. Let some more dissolve, then weigh it again.`);
       weighed = now;
     };
-    el("tip").onclick = () => { weighed = null; added = dissolved = 0; msg("Empty beaker, fresh water."); render(); };
+    el("tip").onclick = () => { weighed = null; pileAt = null; added = dissolved = 0; msg("Empty beaker, fresh water."); render(); };
 
     // Heating a saturated beaker takes the pile away; cooling one puts it back. Both are watched.
-    let lastCap = limit(solid, temp), heatedAway = false;
+    // pileAt is how much the water could hold while a pile sat on the bottom; if the water later holds
+    // more and the pile has gone, heating did it (dissolving takes a moment, so this is checked every frame).
+    let lastCap = limit(solid, temp), pileAt = null;
     let last = performance.now();
     (function loop(now) {
       if (!document.body.contains(root)) return;
@@ -1786,6 +1826,10 @@ ARCADE.toy({
           if (solid === "salt" && ks.length >= 2 && ks[ks.length - 1] - ks[0] >= 40) api.found("flat");
         }
       }
+      if (excess > 0.3 && added > cap) pileAt = pileAt === null ? cap : Math.min(pileAt, cap);
+      if (pileAt !== null && excess < 0.05 && cap > pileAt + 0.05) { pileAt = null; api.found("heat"); msg("Hot water holds more, so the pile at the bottom dissolved away."); }
+      if (cap < lastCap - 0.05 && added > cap && excess > 0.3) { api.found("cool"); msg("Cooler water holds less, so the extra came back out as crystals."); }
+      lastCap = cap;
       render(excess, cap);
       requestAnimationFrame(loop);
     })(performance.now());
@@ -1793,19 +1837,18 @@ ARCADE.toy({
     function render(excess, cap) {
       cap = cap === undefined ? limit(solid, temp) : cap;
       excess = excess === undefined ? Math.max(0, added - dissolved) : excess;
-      if (cap > lastCap + 0.05 && added > lastCap && excess < 0.3 && !heatedAway) { heatedAway = true; api.found("heat"); msg("Hot water holds more, so the pile at the bottom dissolved away."); }
-      if (cap < lastCap - 0.05 && added > cap && excess > 0.3) { heatedAway = false; api.found("cool"); msg("Cooler water holds less, so the extra came back out as crystals."); }
-      lastCap = cap;
-
       const s = SOLIDS[solid];
       const strength = s.tint ? Math.min(0.85, dissolved / Math.max(0.001, limit("copper", 100)) * 1.6) : 0;
       el("water").setAttribute("fill", s.tint ? `rgba(74,144,217,${0.18 + strength})` : "#dbeaf6");
-      const ph = Math.min(48, excess * 7);
-      el("pile").innerHTML = ph > 1 ? `<path d="M62 198 Q120 ${198 - ph} 178 198 Z" fill="${s.colour}" stroke="#7f8c99" stroke-width="2"/>` : "";
-      el("grains").innerHTML = pouring ? [0, 1, 2].map(i => `<circle cx="${120 + (i - 1) * 8}" cy="${58 + ((performance.now() / 4 + i * 26) % 40)}" r="4" fill="${s.colour}" stroke="#7f8c99"/>`).join("") : "";
-      const fh = 6 + (temp - 10) * 0.42;
-      el("flame").setAttribute("opacity", temp > 14 ? Math.min(1, (temp - 14) / 30) : 0);
-      el("flame").setAttribute("d", `M104 248 Q120 ${248 - fh} 136 248 Q120 254 104 248 Z`);
+      const ph = excess > 0.1 ? Math.min(48, 5 + excess * 8) : 0;
+      el("pile").innerHTML = ph > 1 ? `<path d="M56 188 Q104 ${188 - ph} 140 188 Z" fill="${s.colour}" stroke="#7f8c99" stroke-width="2"/>` : "";
+      el("grains").innerHTML = pouring ? [0, 1, 2].map(i => `<circle cx="${96 + (i - 1) * 8}" cy="${44 + ((performance.now() / 4 + i * 26) % 40)}" r="4" fill="${s.colour}" stroke="#7f8c99"/>`).join("") : "";
+      // Room temperature is 20 °C: the burner is only lit above that.
+      const fh = 6 + Math.max(0, (temp - 20) * 0.3);
+      el("flame").setAttribute("opacity", temp > 22 ? 1 : 0);
+      el("flame").setAttribute("d", `M100 232 Q100 ${232 - fh * 0.5} 110 ${232 - fh} Q120 ${232 - fh * 0.5} 120 232 Z`);
+      const mh = 8 + 132 * (temp / 100);
+      el("merc").setAttribute("y", 180 - mh); el("merc").setAttribute("height", mh);
       el("sat").textContent = added > cap + 0.05 ? "SATURATED" : "";
       el("r4").textContent = `the balance reads ${(WATER + added).toFixed(1)} g`;
       el("r1").textContent = `added ${added.toFixed(1)} g`;
@@ -1815,15 +1858,19 @@ ARCADE.toy({
       // Every solid the student has saturated stays on one shared graph, so salt's flat line ends
       // up beside sugar's steep one — the comparison is the discovery, not any single line.
       const series = Object.entries(points).map(([k, got]) => [k, Object.keys(got).map(Number).sort((a, b) => a - b).map(t => [t, got[t]])]).filter(([, pts]) => pts.length);
-      const ymax = Math.max(50, ...series.flatMap(([, pts]) => pts.map(p => p[1]))) * 1.15;
-      el("ymax").textContent = series.length ? Math.round(ymax) : "";
-      const px = t => 214 + 172 * t / 100, py = y => 188 - 152 * Math.min(1, y / ymax);
+      const top = Math.max(40, ...series.flatMap(([, pts]) => pts.map(p => p[1]))) * 1.1;
+      const step = [10, 20, 50, 100, 200].find(st => top / st <= 5) || 100, ymax = Math.ceil(top / step) * step;
+      const px = t => 50 + 235 * t / 100, py = y => 200 - 180 * Math.min(1, y / ymax);
+      el("axes").innerHTML = [0, 20, 40, 60, 80, 100].map(t => `<line x1="${px(t)}" y1="200" x2="${px(t)}" y2="205" class="edge" stroke-width="2"/><text x="${px(t)}" y="220" font-size="11" class="lbl" text-anchor="middle">${t}</text>`).join("")
+        + Array.from({ length: ymax / step + 1 }, (_, i) => i * step).map(y => `<line x1="50" y1="${py(y)}" x2="285" y2="${py(y)}" class="edge" stroke-width="1" opacity="${y ? 0.6 : 0}"/><text x="44" y="${py(y) + 4}" font-size="11" class="lbl" text-anchor="end">${y}</text>`).join("")
+        + `<path d="M50 20 V200 H285" fill="none" stroke="#9aa6b3" stroke-width="2"/>`;
+      el("hint").style.display = series.length ? "none" : "";
       el("plot").innerHTML = series.map(([k, pts]) => {
         const c = SOLIDS[k].line, wide = k === solid ? 4 : 2.5;
         return (pts.length > 1 ? `<polyline points="${pts.map(p => px(p[0]) + "," + py(p[1])).join(" ")}" fill="none" stroke="${c}" stroke-width="${wide}"/>` : "")
           + pts.map(p => `<circle cx="${px(p[0])}" cy="${py(p[1])}" r="${k === solid ? 5 : 4}" fill="${c}"/>`).join("");
-      }).join("") + `<path d="M${px(temp)} 188 l-5 10 h10 Z" fill="#b4531f"/>`;
-      el("legend").innerHTML = series.map(([k], i) => `<circle cx="226" cy="${54 + i * 16}" r="5" fill="${SOLIDS[k].line}"/><text x="236" y="${58 + i * 16}" font-size="12" fill="#5b6675"${k === solid ? ' font-weight="bold"' : ""}>${SOLIDS[k].name}</text>`).join("");
+      }).join("") + `<path d="M${px(temp)} 200 l-5 -9 h10 Z" fill="#b4531f"/>`;
+      el("legend").innerHTML = series.map(([k]) => `<span style="margin:0 8px;white-space:nowrap${k === solid ? ";font-weight:bold" : ""}"><span class="swatch" style="background:${SOLIDS[k].line}"></span>${SOLIDS[k].name}</span>`).join("");
     }
     render();
   },
@@ -1864,24 +1911,25 @@ ARCADE.toy({
     let meas = null, markY = null, dragging = false;
     root.innerHTML = `
       <p class="muted" id="story">Somebody ate the last biscuit and left this note. Pick a pen, tap the paper to dot it on the pencil line, then dip.</p>
-      <svg viewBox="0 0 400 300" id="lab" role="img" aria-label="Chromatography paper standing in a beaker of solvent">
+      <svg class="scene" viewBox="40 0 386 300" id="lab" role="img" aria-label="Chromatography paper standing in a beaker of solvent">
         <rect id="paper" x="104" y="26" width="192" height="260" fill="#fffdf6" stroke="#ded7c6" stroke-width="2"/>
         <line id="front" x1="104" y1="26" x2="296" y2="26" stroke="#7fb4d8" stroke-width="3" stroke-dasharray="7 4" opacity="0"/>
-        <text id="frontlab" x="300" y="30" font-size="12" fill="#7fb4d8" opacity="0">solvent front</text>
+        <text id="frontlab" x="332" y="30" font-size="14" fill="#5b9bc8" opacity="0">solvent front</text>
         <g id="wet"></g>
         <line id="startline" x1="104" y1="${START}" x2="296" y2="${START}" stroke="#9aa6b3" stroke-width="2" stroke-dasharray="5 4"/>
-        <text id="linelab" x="300" y="${START + 4}" font-size="12" fill="#9aa6b3">pencil line</text>
-        <path d="M76 232 L76 288 L324 288 L324 232" fill="none" stroke="#7f8c99" stroke-width="4"/>
+        <text id="linelab" x="332" y="${START + 4}" font-size="14" class="lbl">pencil line</text>
+        <path d="M76 232 L76 288 L324 288 L324 232" fill="#9fc6e0" fill-opacity=".1" stroke="#7f8c99" stroke-width="4"/>
         <rect id="solvent" x="78" y="248" width="244" height="38" fill="#dbeaf6" opacity=".85"/>
-        <text x="200" y="274" text-anchor="middle" font-size="13" fill="#5b6675">solvent</text>
-        <g id="spots"></g><g id="rulermarks"></g><g id="marker"></g>
+        <text x="200" y="275" text-anchor="middle" font-size="14" fill="#5b6675">solvent</text>
+        <text x="332" y="286" font-size="14" class="lbl">beaker</text>
+        <g id="names"></g><g id="spots"></g><g id="rulermarks"></g><g id="marker"></g>
       </svg>
-      <div class="ctrl" id="pens">${ALL.map(p => `<button data-pen="${p.key}" class="${p.key === "note" ? "on" : ""}">
-        <span style="display:inline-block;width:.8em;height:.8em;border-radius:50%;background:${p.ink};margin-right:6px"></span>${p.name}</button>`).join("")}</div>
+      <div class="ctrl pick" id="pens"><span class="lead">Pen</span>${ALL.map(p => `<button data-pen="${p.key}" class="${p.key === "note" ? "on" : ""}">
+        <span class="swatch" style="background:${p.ink};border-radius:50%"></span>${p.name}</button>`).join("")}</div>
       <div class="ctrl"><button id="dip">💧 Dip the paper</button><button id="rule">📏 Ruler off</button>
         <button id="low">⬇ Start the ink lower</button><button id="reset">🔄 Fresh paper</button></div>
       <div id="say" class="muted"></div>
-      <div class="ctrl" id="accuse" hidden>${PENS.map(p => `<button data-acc="${p.key}">It was ${p.name}</button>`).join("")}</div>`;
+      <div class="ctrl pick" id="accuse" hidden><span class="lead">Who did it?</span>${PENS.map(p => `<button data-acc="${p.key}">${p.name}</button>`).join("")}</div>`;
 
     const svg = document.getElementById("lab"), el = id => document.getElementById(id);
     const say = msg => { if (said === msg) return; said = msg; el("say").textContent = msg; api.say(msg); };
@@ -1891,7 +1939,7 @@ ARCADE.toy({
     });
     svg.addEventListener("click", e => {
       if (running || dipped) return;
-      const r = svg.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * 400;
+      const r = svg.getBoundingClientRect(), x = 40 + (e.clientX - r.left) / r.width * 386;
       if (x < 112 || x > 288) return;
       const pen = ALL.find(p => p.key === picked);
       spots.push({ pen, x: Math.round(x) });
@@ -1961,15 +2009,17 @@ ARCADE.toy({
       el("spots").innerHTML = spots.map((s, i) => s.gone ? "" : (front === 0
         ? `<circle cx="${s.x}" cy="${base}" r="7" fill="${s.pen.ink}"/>`
         : s.pen.dyes.map(([rf, col], j) => `<ellipse data-dye="${i}:${j}" cx="${s.x}" cy="${base - RUN * front * rf}" rx="9" ry="6" fill="${col}" opacity=".88" class="grab"/>`).join(""))).join("");
+      // Each spot's owner is written in pencil under the line, as you would on real paper.
+      el("names").innerHTML = spots.map(s => s.gone ? "" : `<text x="${s.x}" y="${base + 22}" text-anchor="middle" font-size="13">${s.pen.name.split(" ")[0]}</text>`).join("");
       el("wet").innerHTML = front > 0 ? `<rect x="104" y="${fy}" width="192" height="${base - fy + 10}" fill="#eaf4fb" opacity=".55"/>` : "";
       el("rulermarks").innerHTML = ruler ? `<rect x="84" y="${base - RUN - 4}" width="20" height="${RUN + 8}" fill="#fff8dc" stroke="#c9b458"/>` + Array.from({ length: 17 }, (_, k) => {
         const y = base - RUN * (k / 16), big = k % 2 === 0;
-        return `<line x1="${big ? 88 : 96}" y1="${y}" x2="104" y2="${y}" stroke="#5b6675" stroke-width="${big ? 2 : 1}"/>` + (big ? `<text x="80" y="${y + 4}" text-anchor="end" font-size="11" fill="#5b6675">${k * 10}</text>` : "");
-      }).join("") + `<text x="80" y="${base - RUN - 10}" text-anchor="end" font-size="11" fill="#5b6675">mm</text>` : "";
+        return `<line x1="${big ? 88 : 96}" y1="${y}" x2="104" y2="${y}" stroke="#5b6675" stroke-width="${big ? 2 : 1}"/>` + (big ? `<text x="80" y="${y + 4}" text-anchor="end" font-size="13" class="lbl">${k * 10}</text>` : "");
+      }).join("") + `<text x="80" y="${base + 18}" text-anchor="end" font-size="12" class="lbl">mm</text>` : "";
       const mm = y => Math.round((base - y) / RUN * 160);
       el("marker").innerHTML = ruler && meas && markY !== null
         ? `<line x1="84" y1="${markY}" x2="296" y2="${markY}" stroke="#b4531f" stroke-width="2" stroke-dasharray="4 3"/>
-           <g class="grab" id="mk"><rect x="48" y="${markY - 14}" width="40" height="28" rx="8" fill="#b4531f"/><text x="68" y="${markY + 5}" text-anchor="middle" font-size="12" fill="#fff">${mm(markY)}</text></g>`
+           <g class="grab" id="mk"><rect x="48" y="${markY - 14}" width="40" height="28" rx="8" fill="#b4531f"/><text x="68" y="${markY + 5}" text-anchor="middle" font-size="13" fill="#fff">${mm(markY)}</text></g>`
         : "";
       const mk = document.getElementById("mk");
       if (mk) mk.addEventListener("pointerdown", e => { e.preventDefault(); e.stopPropagation(); dragging = true; mk.setPointerCapture(e.pointerId); });
