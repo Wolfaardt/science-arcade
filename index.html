@@ -3151,6 +3151,833 @@ ARCADE.toy({
   },
 });
 
+// Salt Works — Grade 10 (IGCSE 2) Unit 7, Acids, Bases and Salts.
+//
+// Four benches: six bottles at four concentrations under four indicators, with a zoom that shows
+// how many acid molecules have let go of their H⁺ (strong vs weak, strength vs concentration); a
+// reaction bench where solids go into acid or alkali and the gas gets tested; a titration whose pH
+// curve draws itself and whose crystals show whether the indicator was left in; and a salt maker
+// where any method can be tried on any salt and the wrong road plays out rather than being refused.
+//
+// Layout rules (agent-contract §6): every drawing is an svg.scene inside its own viewBox, labels at
+// 12 units or more, readouts in HTML chips, option pickers in .ctrl.pick.
+ARCADE.toy({
+  id: "g10-igcse2-u07-saltworks", unit: "g10-igcse2-u07", order: 1,
+  name: "Salt Works", icon: "🧂",
+  blurb: "Test acids, fizz metals, titrate to one drop and grow your own salt crystals",
+  discoveries: [
+    ["red", "Strongly acidic", "Put universal indicator in a strong acid"],
+    ["purple", "Strongly alkaline", "Find a purple solution"],
+    ["neutral", "Neutral", "Test pure water"],
+    ["dilute", "Ten times more dilute", "Dilute hydrochloric acid and watch the pH go up by one"],
+    ["weak", "Weak acid", "Compare ethanoic and hydrochloric acid at the same concentration"],
+    ["strongconc", "Strong is not concentrated", "Find a dilute strong acid with a higher pH than a concentrated weak acid"],
+    ["mo", "Methyl orange", "See methyl orange turn yellow"],
+    ["thymol", "Blue only in alkali", "See thymolphthalein turn blue"],
+    ["pop", "Squeaky pop", "Test the gas from a metal and an acid"],
+    ["milky", "Milky limewater", "Test the gas from a carbonate and an acid"],
+    ["copper", "Below hydrogen", "Put copper in acid"],
+    ["blue", "Blue, no fizz", "Dissolve copper(II) oxide in acid"],
+    ["amphoteric", "Both ways", "Dissolve zinc oxide in an acid and in an alkali"],
+    ["ammonia", "An alkaline gas", "Warm an ammonium salt with alkali and test the gas"],
+    ["acidox", "Acidic oxide", "Bubble carbon dioxide into the alkali"],
+    ["names", "Three salt families", "Make a chloride, a sulfate and a nitrate"],
+    ["endpoint", "End-point", "Stop the titration on the exact colour change"],
+    ["overshoot", "One drop too many", "Go past the end-point"],
+    ["jump", "The pH jump", "See the pH leap near the end-point"],
+    ["hot", "It warms up", "Watch the thermometer during neutralisation"],
+    ["dyed", "Dyed crystals", "Evaporate with the indicator still in"],
+    ["pure", "Pure salt", "Repeat with no indicator and the same volume"],
+    ["excess", "Method 1", "Make a soluble salt from an excess of solid"],
+    ["titrate", "Method 2", "Make a sodium or potassium salt by titration"],
+    ["precip", "Method 3", "Make an insoluble salt by precipitation"],
+    ["wrongway", "The wrong road", "Try a method that does not fit the salt"],
+    ["anhydrous", "White powder", "Heat blue copper(II) sulfate crystals"],
+    ["rehydrate", "Blue again", "Add water back to the white powder"],
+  ],
+  mount(root, api) {
+    const rand = (a, b) => a + Math.random() * (b - a);   // api.rnd(n) is a whole number below n
+    let tab = "ph", run = 0;
+    const alive = r => r === run && document.body.contains(root);
+    const tabs = [["ph", "🌈 pH and strength"], ["react", "🫧 Reactions"], ["titr", "💧 Titration"], ["salt", "🧂 Make a salt"]];
+    const el = id => document.getElementById(id);
+    const say = m => { const p = el("msg"); if (p && p.textContent !== m) { p.textContent = m; api.say(m); } };
+    function shell(inner) {
+      run++;
+      root.innerHTML = `<div class="ctrl tabs">${tabs.map(([k, n]) =>
+        `<button data-tab="${k}" class="${k === tab ? "on" : ""}">${n}</button>`).join("")}</div><div id="bench">${inner}</div>`;
+      root.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { tab = b.dataset.tab; draw(); });
+      return run;
+    }
+    function draw() { ({ ph: phBench, react: reactBench, titr: titrBench, salt: saltBench })[tab](); }
+    const pickRow = (attr, label, opts, on) => `<div class="ctrl pick"><span class="lead">${label}</span>${opts.map(([k, n]) =>
+      `<button data-${attr}="${k}" class="${k === on ? "on" : ""}">${n}</button>`).join("")}</div>`;
+    const wirePick = (attr, fn) => root.querySelectorAll(`[data-${attr}]`).forEach(b => b.onclick = () => {
+      root.querySelectorAll(`[data-${attr}]`).forEach(o => o.classList.toggle("on", o === b)); fn(b.dataset[attr]); });
+
+    // Indicator colours, by pH. Universal follows the usual chart; the three named ones follow Figure 1.
+    const UI = ["#c62828", "#d84315", "#ef6c00", "#f9a825", "#fdd835", "#c0ca33", "#7cb342", "#43a047", "#26a69a", "#1e88e5", "#3949ab", "#5e35b1", "#6a1b9a", "#5b1a7e", "#4a148c"];
+    const IND = {
+      universal: ["Universal", ph => UI[Math.max(0, Math.min(14, Math.round(ph)))]],
+      litmus: ["Litmus", ph => ph < 5 ? "#c62828" : ph > 8 ? "#1e5fbf" : "#7b4fa0"],
+      mo: ["Methyl orange", ph => ph < 3.1 ? "#d32f2f" : ph < 4.4 ? "#f57c00" : "#fbc02d"],
+      thymol: ["Thymolphthalein", ph => ph < 9.3 ? null : ph < 10.5 ? "#7fb2e6" : "#1e5fbf"],
+      none: ["No indicator", () => null],
+    };
+    const Ka = 1.8e-5;
+    const weakH = c => (-Ka + Math.sqrt(Ka * Ka + 4 * Ka * c)) / 2;   // [H⁺] from c = [HA] + [H⁺]
+    const BOT = {
+      hcl: ["Hydrochloric acid", "HCl", c => -Math.log10(c), c => 1],
+      eth: ["Ethanoic acid", "CH₃COOH", c => -Math.log10(weakH(c)), c => weakH(c) / c],
+      h2so4: ["Sulfuric acid", "H₂SO₄", c => -Math.log10(2 * c), c => 1],
+      water: ["Pure water", "H₂O", () => 7, () => 0],
+      naoh: ["Sodium hydroxide", "NaOH", c => 14 + Math.log10(c), c => 1],
+      nh3: ["Aqueous ammonia", "NH₃", c => 14 + Math.log10(weakH(c)), c => weakH(c) / c],
+    };
+
+    // ── pH and strength ────────────────────────────────────────────────
+    function phBench() {
+      let bot = "hcl", conc = "0.1", ind = "universal", seenPH = {};
+      const r = shell(`${pickRow("bt", "Bottle", Object.entries(BOT).map(([k, b]) => [k, b[0]]), bot)}
+        ${pickRow("cc", "Concentration", [["1", "1.0"], ["0.1", "0.1"], ["0.01", "0.01"], ["0.001", "0.001 mol/dm³"]], conc)}
+        ${pickRow("in", "Indicator", Object.entries(IND).filter(([k]) => k !== "none").map(([k, i]) => [k, i[0]]), ind)}
+        <div class="duo">
+          <svg class="scene" viewBox="0 0 260 230" role="img" aria-label="A beaker of the solution with a magnified view of its particles"><g id="bk"></g></svg>
+          <svg class="scene" viewBox="0 0 260 230" role="img" aria-label="The pH scale with a pointer, and a bulb in a conductivity circuit"><g id="sc"></g></svg></div>
+        <div class="readout"><span class="chip" id="r1"></span><span class="chip" id="r2" style="white-space:normal"></span><span class="chip" id="r3"></span></div>
+        <p class="muted" id="msg">Pick a bottle, a concentration and an indicator.</p>`);
+      function paint() {
+        const B = BOT[bot], c = +conc, ph = B[2](c), frac = B[3](c), acid = ["hcl", "eth", "h2so4"].includes(bot), alk = ["naoh", "nh3"].includes(bot);
+        const col = IND[ind][1](ph);
+        // zoom: 12 units of the dissolved substance; split ones drawn as separate ions
+        const nSplit = bot === "water" ? 0 : frac >= 0.99 ? 12 : Math.max(1, Math.round(12 * frac));
+        let zoom = "";
+        for (let i = 0; i < 12; i++) {
+          const x = 52 + (i % 4) * 26 + (i >= 8 ? 6 : 0), y = 150 + Math.floor(i / 4) * 22, split = i < nSplit;
+          if (bot === "water") { zoom += `<circle cx="${x}" cy="${y}" r="6" fill="#5aa9e6" opacity=".6"/>`; continue; }
+          const pos = acid ? "H⁺" : bot === "naoh" ? "Na⁺" : "NH₄⁺", neg = acid ? (bot === "h2so4" ? "SO₄²⁻" : bot === "hcl" ? "Cl⁻" : "A⁻") : "OH⁻";
+          if (split && bot === "h2so4") zoom += `<circle cx="${x - 7}" cy="${y - 5}" r="4" fill="#d64545"/><circle cx="${x - 7}" cy="${y + 5}" r="4" fill="#d64545"/><circle cx="${x + 6}" cy="${y}" r="6" fill="#7f8c99"/>`;
+          else if (split) zoom += `<circle cx="${x - 6}" cy="${y}" r="5" fill="${acid ? "#d64545" : "#7f8c99"}"/><circle cx="${x + 7}" cy="${y + 2}" r="6" fill="${acid ? "#7f8c99" : "#2f6f9f"}"/>`;
+          else zoom += `<rect x="${x - 11}" y="${y - 6}" width="22" height="12" rx="6" fill="#c9b27c" stroke="#8d7a4d"/>`;
+        }
+        el("bk").innerHTML = `<path d="M30 20 V122 Q30 132 40 132 H110 Q120 132 120 122 V20" fill="none" stroke="#7f8c99" stroke-width="3"/>
+          <rect x="33" y="44" width="84" height="86" rx="6" fill="${col || "#eef4f8"}" opacity="${col ? .85 : .6}"/>
+          <text x="75" y="38" text-anchor="middle" font-size="12" class="lbl">${B[1]}</text>
+          <circle cx="98" cy="96" r="14" fill="none" stroke="#5b6675" stroke-width="2"/><path d="M108 106 L138 138" stroke="#5b6675" stroke-width="3"/>
+          <rect x="34" y="136" width="210" height="88" rx="10" class="bgc" stroke="#5b6675" stroke-width="2"/>${zoom}
+          <text x="146" y="34" font-size="12" class="lbl">${IND[ind][0]}</text>
+          <text x="146" y="54" font-size="15" font-weight="bold">${col ? "" : "colourless"}</text>
+          ${bot === "water" ? "" : `<g transform="translate(176 154)"><rect x="-6" y="-6" width="14" height="10" rx="5" fill="#c9b27c"/><text x="12" y="3" font-size="12" class="lbl">whole</text>
+            <circle cy="18" r="5" fill="${acid ? "#d64545" : "#2f6f9f"}"/><text x="12" y="22" font-size="12" class="lbl">${acid ? "H⁺" : "OH⁻"}</text>
+            <circle cy="36" r="5" fill="#7f8c99"/><text x="12" y="40" font-size="12" class="lbl">other ion</text></g>`}`;
+        const ions = bot === "water" ? 0 : frac * c * (bot === "h2so4" ? 2 : 1), px = 20 + ph / 14 * 220, glow = ions ? Math.max(0, Math.min(1, (Math.log10(ions) + 4) / 3.5)) : 0;
+        el("sc").innerHTML = UI.map((u, i) => `<rect x="${20 + i * 220 / 15}" y="40" width="${220 / 15 + 0.5}" height="26" fill="${u}"/>`).join("")
+          + [0, 7, 14].map(v => `<text x="${20 + v / 14 * 220}" y="84" text-anchor="middle" font-size="12" class="lbl">${v}</text>`).join("")
+          + `<text x="20" y="102" font-size="12" class="lbl">acidic</text><text x="240" y="102" text-anchor="end" font-size="12" class="lbl">alkaline</text>
+          <path d="M${px} 36 l-7 -12 h14 z" fill="#2b2f36" stroke="#ffffff"/>
+          <path d="M60 130 H200 V200 H60 Z" fill="none" stroke="#5b6675" stroke-width="3"/>
+          <rect x="114" y="120" width="32" height="20" fill="#cfd8e2" stroke="#5b6675" stroke-width="2"/><text x="130" y="135" text-anchor="middle" font-size="12">+ −</text>
+          ${glow > 0.02 ? `<circle cx="200" cy="165" r="${16 + 14 * glow}" fill="#ffe066" opacity="${0.15 + 0.35 * glow}"/>` : ""}
+          <circle cx="200" cy="165" r="13" fill="${glow > 0.02 ? "#ffe066" : "#f4f1ea"}" fill-opacity="${0.4 + 0.6 * glow}" stroke="#5b6675" stroke-width="2"/>
+          <text x="130" y="222" text-anchor="middle" font-size="12" class="lbl">bulb: ${glow > 0.5 ? "bright" : glow > 0.05 ? "dim" : "off"}</text>`;
+        el("r1").textContent = `pH ${ph.toFixed(1)}`;
+        el("r2").textContent = bot === "water" ? "H⁺ and OH⁻ equal" : frac >= 0.99 ? "every molecule split into ions" : `about 1 in ${Math.round(1 / frac)} split into ions`;
+        el("r3").textContent = acid ? (frac >= 0.99 ? "strong acid" : "weak acid") : alk ? (frac >= 0.99 ? "strong alkali" : "weak alkali") : "neutral";
+        return { ph, c, frac };
+      }
+      function check() {
+        const { ph, c } = paint(), key = bot + "@" + conc;
+        const prev = seenPH; seenPH[key] = ph;
+        if (bot === "water" && api.found("neutral")) return say("pH 7, green: pure water has exactly as many hydrogen ions as hydroxide ions.");
+        if (ind === "universal" && ph < 2.5 && api.found("red")) return say("Red: pH below 3, very many hydrogen ions. Lower pH means more H⁺.");
+        if (ind === "universal" && ph > 12 && api.found("purple")) return say("Purple: strongly alkaline, very many hydroxide ions.");
+        if (ind === "mo" && ph > 4.4 && api.found("mo")) return say("Methyl orange finishes changing — to yellow — at about pH 4.4, while a solution is still acidic. So yellow does not prove an alkali.");
+        if (ind === "thymol" && ph > 10.5 && api.found("thymol")) return say("Thymolphthalein stays colourless until about pH 9.3, so it only shows blue once the solution is properly alkaline.");
+        if (bot === "hcl" && (prev["hcl@" + (c * 10)] !== undefined || prev["hcl@" + (c / 10)] !== undefined) && api.found("dilute")) return say("Ten times more dilute, one pH unit higher. The pH scale counts in powers of ten.");
+        if ((bot === "hcl" && prev["eth@" + conc] !== undefined) || (bot === "eth" && prev["hcl@" + conc] !== undefined))
+          if (api.found("weak")) return say(`Same concentration, different pH. Hydrochloric acid splits completely into ions; ethanoic acid only about 1 molecule in ${Math.round(c / weakH(c))}. Fewer H⁺, higher pH — it is weak.`);
+        if ((bot === "hcl" && conc === "0.001" && seenPH["eth@1"] !== undefined) || (bot === "eth" && conc === "1" && seenPH["hcl@0.001"] !== undefined))
+          if (api.found("strongconc")) return say("The strong acid has the higher pH here, because it is so dilute. Strong means fully split into ions. Concentrated means a lot dissolved. Different words.");
+        if (bot === "h2so4") return say("Sulfuric acid gives two H⁺ per molecule, so its pH is lower than hydrochloric acid at the same concentration.");
+        if (bot === "eth") return say("Ethanoic acid is weak: most molecules stay whole, CH₃COOH ⇌ H⁺ + CH₃COO⁻.");
+        if (bot === "nh3") return say("Ammonia is a weak alkali — only a few molecules take an H⁺ from water to make OH⁻.");
+        say(`${BOT[bot][0]}, ${conc} mol/dm³: pH ${ph.toFixed(1)}.`);
+      }
+      wirePick("bt", k => { bot = k; check(); });
+      wirePick("cc", k => { conc = k; check(); });
+      wirePick("in", k => { ind = k; check(); });
+      paint();
+    }
+
+    // ── reactions of acids, bases and oxides ────────────────────────────
+    function reactBench() {
+      const LIQ = { hcl: ["dilute hydrochloric acid", "chloride", "HCl"], h2so4: ["dilute sulfuric acid", "sulfate", "H₂SO₄"], hno3: ["dilute nitric acid", "nitrate", "HNO₃"], naoh: ["sodium hydroxide", null, "NaOH"] };
+      // solid: [name, metal-part, kind, solid colour, solution colour when dissolved]
+      const SOL = {
+        mg: ["magnesium", "magnesium", "metal", "#c9ced6", null], zn: ["zinc", "zinc", "metal", "#aeb7c2", null], cu: ["copper", "copper", "below", "#c46a3a", null],
+        caco3: ["calcium carbonate", "calcium", "carb", "#f4f1ea", null], cuco3: ["copper(II) carbonate", "copper(II)", "carb", "#4f9a7a", "#4f9fd8"],
+        cuo: ["copper(II) oxide", "copper(II)", "oxide", "#2b2b2b", "#4f9fd8"], zno: ["zinc oxide", "zinc", "amph", "#ffffff", null],
+        nh4cl: ["ammonium chloride", "ammonium", "amm", "#ffffff", null], co2: ["carbon dioxide gas", null, "co2", null, null],
+      };
+      let liq = "hcl", sol = "mg", gas = null, fizz = 0, soln = null, solid = 0, eq = "", warm = false, test = null, made = {}, amph = {};
+      const r = shell(`${pickRow("lq", "In the flask", Object.entries(LIQ).map(([k, l]) => [k, l[2]]), liq)}
+        ${pickRow("sl", "Add", Object.entries(SOL).map(([k, s]) => [k, s[0]]), sol)}
+        <div class="duo">
+          <svg class="scene" viewBox="0 0 260 230" role="img" aria-label="A flask of liquid on a tripod, with a delivery tube"><g id="fl"></g></svg>
+          <svg class="scene" viewBox="0 0 260 230" role="img" aria-label="The gas test"><g id="gt"></g></svg></div>
+        <div class="ctrl"><button id="add">➕ Add it</button><button id="warmb">🔥 Warm gently</button><button id="fresh">🔄 Fresh flask</button></div>
+        <div class="ctrl"><span class="lead muted">Test the gas</span><button data-t="splint">🔥 Lighted splint</button><button data-t="lime">🥛 Limewater</button><button data-t="litmus">📄 Damp red litmus</button></div>
+        <div class="readout"><span class="chip" id="r1" style="white-space:normal"></span></div>
+        <p class="muted" id="msg">Choose what is in the flask and what to add.</p>`);
+      function fresh(m) { gas = null; fizz = 0; soln = null; solid = 0; eq = ""; warm = false; test = null; el("warmb").classList.remove("on"); say(m || `A flask of ${LIQ[liq][0]}.`); }
+      wirePick("lq", k => { liq = k; fresh(); });
+      wirePick("sl", k => { sol = k; fresh(`Fresh ${LIQ[liq][0]}. Press Add to put in the ${SOL[k][0]}.`); });
+      el("fresh").onclick = () => fresh();
+      el("warmb").onclick = () => { warm = !warm; el("warmb").classList.toggle("on", warm); if (warm && sol === "nh4cl" && liq === "naoh" && solid) react(); };
+      function react() {
+        const L = LIQ[liq], S = SOL[sol], acid = liq !== "naoh";
+        gas = null; fizz = 0; test = null; solid = sol === "co2" ? 0 : 1;
+        if (acid) {
+          const salt = S[1] ? `${S[1]} ${L[1]}` : "";
+          if (S[2] === "metal") { gas = "H₂"; fizz = sol === "mg" ? 1 : 0.55; eq = `${S[0]} + ${L[0].replace("dilute ", "")} → ${salt} + hydrogen`; say(`Fizzing — effervescence. A gas is being made. Test it.`); made[L[1]] = true; }
+          else if (S[2] === "below") { eq = "no reaction"; say("Nothing. Copper is below hydrogen in the reactivity series, so it cannot push hydrogen out of the acid."); api.found("copper"); }
+          else if (S[2] === "carb") { gas = "CO₂"; fizz = 0.8; soln = S[4]; eq = `${S[0]} + ${L[0].replace("dilute ", "")} → ${salt} + water + carbon dioxide`; say("Fizzing again — but is it the same gas? Test it."); made[L[1]] = true; }
+          else if (S[2] === "oxide" || S[2] === "amph") { soln = S[4]; eq = `${S[0]} + ${L[0].replace("dilute ", "")} → ${salt} + water`; made[L[1]] = true;
+            if (sol === "cuo" && api.found("blue")) say("The black powder dissolves into a blue solution — and no fizzing. Acid + base gives a salt and water only, no gas. The blue is the copper(II) ion.");
+            else if (sol === "zno") { amph.acid = true; say("Zinc oxide dissolves in the acid: it behaves as a base."); }
+            else say("It dissolves with no gas: a salt and water."); }
+          else if (S[2] === "amm") { eq = "it just dissolves"; say("Ammonium chloride just dissolves in the acid — it is already a salt."); }
+          else { solid = 0; eq = "no reaction"; say("Carbon dioxide bubbles straight through. An acidic oxide does not react with an acid."); }
+          if (made.chloride && made.sulfate && made.nitrate && api.found("names")) say("Chloride from hydrochloric, sulfate from sulfuric, nitrate from nitric. The acid always names the second half of the salt.");
+        } else {
+          if (sol === "zno") { amph.base = true; soln = null; eq = "zinc oxide + sodium hydroxide + water → sodium zincate"; say("Zinc oxide dissolves in the alkali too — here it is behaving as an acid."); }
+          else if (sol === "co2") { eq = "carbon dioxide + sodium hydroxide → sodium carbonate + water"; api.found("acidox"); say("The bubbles shrink as they rise: carbon dioxide is absorbed. A non-metal oxide is an acidic oxide, so it reacts with an alkali to make a salt and water."); }
+          else if (sol === "nh4cl") { eq = "ammonium chloride + sodium hydroxide → sodium chloride + water + ammonia"; if (warm) { gas = "NH₃"; fizz = 0.3; say("Warmed with an alkali, an ammonium salt gives off ammonia. Sharp smell. Test it."); } else say("Now warm it gently."); }
+          else { eq = "no reaction"; say(`${S[0][0].toUpperCase() + S[0].slice(1)} does nothing in sodium hydroxide. ${sol === "cuo" ? "A basic oxide reacts with acids, not alkalis." : "Alkalis react with acids, ammonium salts and acidic or amphoteric oxides."}`); }
+        }
+        if (amph.acid && amph.base && api.found("amphoteric")) say("Zinc oxide dissolved in both an acid and an alkali: it is amphoteric. Aluminium oxide does the same.");
+      }
+      el("add").onclick = () => react();
+      root.querySelectorAll("[data-t]").forEach(b => b.onclick = () => {
+        test = b.dataset.t;
+        if (!gas) return say("No gas coming out of the tube to test.");
+        if (test === "splint") say(gas === "H₂" ? (api.found("pop"), "Squeaky pop! The lighted splint burns the gas: it is hydrogen.") : gas === "CO₂" ? "The splint goes out. Not hydrogen — try limewater." : "No pop. Try damp litmus.");
+        if (test === "lime") say(gas === "CO₂" ? (api.found("milky"), "The limewater turns milky: carbon dioxide. Calcium carbonate forms, which does not dissolve.") : "Limewater stays clear. Not carbon dioxide.");
+        if (test === "litmus") say(gas === "NH₃" ? (api.found("ammonia"), "Damp red litmus turns blue: ammonia, the only common alkaline gas. This is the test for the ammonium ion.") : "The litmus does not change.");
+      });
+      let last = performance.now(), bubbles = [];
+      (function loop(now) {
+        if (!alive(r)) return;
+        const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+        if (solid && fizz) solid = Math.max(0.15, solid - dt * 0.06);
+        if (solid && !fizz && soln) solid = Math.max(0, solid - dt * 0.25);
+        if (sol === "zno" && solid && (amph.acid || amph.base) && !fizz) solid = Math.max(0, solid - dt * 0.25);
+        const co2in = sol === "co2" && eq && liq;
+        if ((fizz || co2in) && Math.random() < (fizz || 0.5) * dt * 30) bubbles.push({ x: co2in ? rand(70, 90) : rand(60, 100), y: co2in ? 176 : 170, r: rand(2, 4), absorb: co2in && liq === "naoh" });
+        bubbles.forEach(b => { b.y -= dt * 60; if (b.absorb) b.r -= dt * 2.5; });
+        bubbles = bubbles.filter(b => b.y > 100 && b.r > 0.3);
+        const S = SOL[sol];
+        el("fl").innerHTML = `<path d="M66 30 V80 L30 170 Q26 184 40 184 H120 Q134 184 130 170 L94 80 V30" fill="#ffffff" fill-opacity=".4" stroke="#7f8c99" stroke-width="3"/>
+          <path d="M46 130 L114 130 L128 170 Q131 181 120 181 H40 Q29 181 32 170 Z" fill="${soln || (liq === "naoh" ? "#eef1f6" : "#e8f1f8")}"/>
+          ${solid && S[3] ? `<ellipse cx="80" cy="176" rx="${6 + 14 * solid}" ry="${2 + 3 * solid}" fill="${S[3]}" stroke="#7f8c99"/>` : ""}
+          ${co2in ? `<path d="M80 6 V172" stroke="#7f8c99" stroke-width="4"/>` : ""}
+          ${bubbles.map(b => `<circle cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="${b.r.toFixed(1)}" fill="none" stroke="#2f6f9f" stroke-width="1.3"/>`).join("")}
+          <path d="M94 40 H170 V90" fill="none" stroke="#9aa6b3" stroke-width="4"/><rect x="58" y="22" width="44" height="12" rx="3" fill="#7f8c99"/>
+          ${warm ? `<path d="M70 210 Q68 196 80 ${188 + Math.sin(now / 90) * 3} Q92 196 90 210 Z" fill="#f2b705"/>` : ""}
+          <path d="M40 192 H120 M50 192 L44 222 M110 192 L116 222" stroke="#8d97a3" stroke-width="3"/>
+          <text x="80" y="122" text-anchor="middle" font-size="12" class="lbl">${LIQ[liq][2]}</text>`;
+        const g = gas;
+        let tv = `<text x="130" y="24" text-anchor="middle" font-size="13" class="lbl">gas from the tube: ${g || "none"}</text>`;
+        if (test === "splint") tv += `<rect x="70" y="120" width="120" height="6" rx="3" fill="#b5895a" transform="rotate(-20 130 123)"/>`
+          + (g === "H₂" ? `<text x="100" y="96" text-anchor="middle" font-size="24" font-weight="bold" fill="#b4531f">POP!</text>` : g === "CO₂" ? `<text x="90" y="106" font-size="12" class="lbl">goes out</text>` : `<path d="M70 104 Q66 92 74 84 Q82 94 78 104 Z" fill="#f2b705"/>`);
+        if (test === "lime") tv += `<path d="M110 50 V180 Q110 196 126 196 Q142 196 142 180 V50" fill="none" stroke="#7f8c99" stroke-width="3"/><rect x="113" y="110" width="26" height="82" rx="6" fill="${g === "CO₂" ? "#eeeeee" : "#e8f1f8"}"/>
+          ${g === "CO₂" ? `<rect x="113" y="110" width="26" height="82" rx="6" fill="#ffffff" opacity=".85"/><text x="160" y="160" font-size="12" class="lbl">milky</text>` : `<text x="160" y="160" font-size="12" class="lbl">clear</text>`}`;
+        if (test === "litmus") tv += `<rect x="112" y="70" width="36" height="110" rx="3" fill="${g === "NH₃" ? "#1e5fbf" : "#d64545"}"/><text x="160" y="130" font-size="12" class="lbl">${g === "NH₃" ? "turned blue" : "still red"}</text>`;
+        if (!test) tv += `<text x="130" y="120" text-anchor="middle" font-size="13" class="lbl">pick a test below</text>`;
+        el("gt").innerHTML = tv;
+        el("r1").textContent = eq || "add something";
+        requestAnimationFrame(loop);
+      })(performance.now());
+    }
+
+    // ── titration ───────────────────────────────────────────────────────
+    // 25.0 cm³ of 0.0938 mol/dm³ NaOH in the flask, 0.100 mol/dm³ HCl in the burette: end-point 23.45 cm³,
+    // off a whole number on purpose so 1 cm³ steps overshoot and the last part has to be done in drops.
+    function titrBench() {
+      let ind = "thymol", v = 0, pts = [[0, 13]], T = 20, crystals = null, run1 = null;
+      const r = shell(`${pickRow("ti", "Indicator in the flask", [["thymol", "Thymolphthalein"], ["mo", "Methyl orange"], ["none", "None"]], ind)}
+        <div class="duo">
+          <svg class="scene" viewBox="0 0 220 260" role="img" aria-label="A burette of acid above a conical flask of alkali, with a thermometer"><g id="rig"></g></svg>
+          <svg class="scene" viewBox="0 0 260 260" role="img" aria-label="pH against volume of acid added"><g id="cur"></g></svg></div>
+        <div class="ctrl"><button id="ml">💧 Add 1.00 cm³</button><button id="drop">💧 Add one drop</button><button id="evap">🧂 Evaporate it</button><button id="again">🔄 Start again</button></div>
+        <div class="readout"><span class="chip" id="r1"></span><span class="chip" id="r2"></span><span class="chip" id="r3"></span></div>
+        <p class="muted" id="msg">25.0 cm³ of sodium hydroxide in the flask, hydrochloric acid in the burette. Add acid until the indicator just changes.</p>`);
+      const VE = 23.45, ph = v => { const ex = (25 * 0.0938 - 0.1 * v) / (25 + v); return Math.abs(v - VE) < 1e-6 ? 7 : ex > 0 ? 14 + Math.log10(ex) : -Math.log10(-ex); };
+      function reset(m) { v = 0; pts = [[0, ph(0)]]; T = 20; crystals = null; say(m || "Fresh flask: 25.0 cm³ of sodium hydroxide. Add acid."); }
+      wirePick("ti", k => { ind = k; reset(k === "none" ? (run1 ? `No indicator this time. You know the titre is ${run1.toFixed(2)} cm³ — add exactly that.` : "No indicator: you cannot see the end-point. Find it with an indicator first.") : null); });
+      function add(d) {
+        if (crystals) return;
+        const was = ph(v); v = Math.round((v + d) * 100) / 100; const now = ph(v);
+        pts.push([v, now]); T = 20 + 6.6 * Math.min(v, VE) / VE;
+        if (T > 23 && api.found("hot")) say("The flask is getting warm. Neutralisation is exothermic: H⁺ + OH⁻ → H₂O gives out energy.");
+        if (v >= VE + 0.5 && pts.some(q => q[1] > 9 && q[0] > VE - 1.5) && api.found("jump")) say("Look at the curve: near the end-point the pH falls from about 10 to about 4 in a drop or two. There is almost nothing left to neutralise, so a single drop changes everything.");
+        const col = IND[ind][1];
+        if (ind !== "none" && col(was) !== col(now)) {
+          if (Math.abs(v - VE) < 0.06) { run1 = v; if (api.found("endpoint")) return say(`End-point at ${v.toFixed(2)} cm³ — the titre. Now repeat with no indicator, so the dye does not end up in your salt.`); }
+          else if (v > VE) return say(`It changed at ${v.toFixed(2)} cm³ — you went past. Use single drops near the end.`);
+        }
+        if (v > VE + 0.06 && api.found("overshoot")) return say("Past the end-point: the flask now has extra acid in it. Your salt would not be pure.");
+      }
+      el("ml").onclick = () => add(1); el("drop").onclick = () => add(0.05);
+      el("evap").onclick = () => {
+        if (v === 0) return say("Nothing to evaporate yet — titrate first.");
+        const exact = Math.abs(v - VE) < 0.06;
+        crystals = ind === "mo" ? "#f5c26b" : ind === "thymol" && v < VE ? "#9cc4ee" : "#ffffff";
+        if (!exact) say(v < VE ? "Crystals of salt mixed with leftover sodium hydroxide — not pure. Stop at the titre." : "Excess acid — the crystals are not pure sodium chloride.");
+        else if (ind !== "none") { api.found("dyed"); say(ind === "mo" ? "Orange-tinged crystals: the methyl orange dye is stuck in your salt. That is why the titration is repeated without it." : "They look white, but the thymolphthalein dye is in there. That is why you repeat without it."); }
+        else if (api.found("pure")) say("Pure, white sodium chloride. Same volumes, no indicator, so nothing else was in the flask.");
+        else say("Pure sodium chloride crystals.");
+      };
+      el("again").onclick = () => reset();
+      reset();
+      let last = performance.now();
+      (function loop(now) {
+        if (!alive(r)) return;
+        const p = ph(v), col = IND[ind][1](p);
+        const lvl = 42 + (v / 50) * 108;
+        el("rig").innerHTML = `<rect x="94" y="10" width="16" height="150" rx="3" fill="#ffffff" fill-opacity=".5" stroke="#7f8c99" stroke-width="2"/>
+          <rect x="96" y="${lvl}" width="12" height="${158 - lvl}" fill="#e8f1f8"/>
+          ${Array.from({ length: 6 }, (_, i) => `<path d="M94 ${42 + i * 21.6} h6" stroke="#5b6675"/><text x="88" y="${46 + i * 21.6}" text-anchor="end" font-size="12" class="lbl">${i * 10}</text>`).join("")}
+          <path d="M102 160 V176" stroke="#7f8c99" stroke-width="4"/><rect x="92" y="162" width="20" height="6" fill="#5b6675"/>
+          <path d="M84 186 L60 240 Q56 250 68 250 H136 Q148 250 144 240 L120 186 Z" fill="#ffffff" fill-opacity=".4" stroke="#7f8c99" stroke-width="3"/>
+          <path d="M70 216 L134 216 L142 238 Q145 247 136 247 H68 Q59 247 62 238 Z" fill="${crystals ? "none" : col || "#eef4f8"}"/>
+          ${crystals ? Array.from({ length: 9 }, (_, i) => `<rect x="${72 + i * 7}" y="${238 - (i % 3) * 4}" width="7" height="7" fill="${crystals}" stroke="#7f8c99" transform="rotate(${i * 17} ${75 + i * 7} ${241})"/>`).join("") : ""}
+          <rect x="160" y="150" width="8" height="96" rx="4" fill="#ffffff" stroke="#9aa6b3"/><rect x="162" y="${240 - (T - 15) * 6}" width="4" height="${(T - 15) * 6 + 4}" fill="#d64545"/>
+          <text x="164" y="142" text-anchor="middle" font-size="12" class="lbl">${T.toFixed(1)} °C</text>
+          <text x="40" y="200" text-anchor="middle" font-size="12" class="lbl">NaOH</text><text x="130" y="24" font-size="12" class="lbl">HCl</text>`;
+        const X = x => 40 + x / 40 * 210, Y = y => 220 - y / 14 * 200;
+        let g = `<path d="M40 16 V220 H250" fill="none" stroke="#5b6675" stroke-width="2"/>`
+          + [0, 7, 14].map(y => `<text x="34" y="${Y(y) + 4}" text-anchor="end" font-size="12" class="lbl">${y}</text>`).join("")
+          + [0, 10, 20, 30, 40].map(x => `<text x="${X(x)}" y="236" text-anchor="middle" font-size="12" class="lbl">${x}</text>`).join("")
+          + `<text x="145" y="254" text-anchor="middle" font-size="12" class="lbl">acid added / cm³</text><text x="16" y="118" text-anchor="middle" font-size="12" class="lbl" transform="rotate(-90 16 118)">pH</text>`
+          + `<path d="M40 ${Y(7)} H250" stroke="#9aa6b3" stroke-dasharray="4 4"/>`;
+        if (pts.length > 1) g += `<polyline points="${pts.map(([a, b]) => `${X(a).toFixed(1)},${Y(b).toFixed(1)}`).join(" ")}" fill="none" stroke="#d64545" stroke-width="2.5"/>`;
+        g += `<circle cx="${X(v)}" cy="${Y(p)}" r="4" fill="#d64545"/>`;
+        el("cur").innerHTML = g;
+        el("r1").textContent = `${v.toFixed(2)} cm³ added`;
+        el("r2").textContent = `pH ${p.toFixed(1)}`;
+        el("r3").textContent = crystals ? "evaporated" : run1 ? `titre ${run1.toFixed(2)} cm³` : "titre: not found yet";
+        requestAnimationFrame(loop);
+      })(performance.now());
+    }
+
+    // ── make a salt ─────────────────────────────────────────────────────
+    function saltBench() {
+      // target: [name, formula, reagents, soluble, group1/ammonium, crystal colour]
+      const SALT = {
+        cuso4: ["copper(II) sulfate", "CuSO₄", "copper(II) oxide + sulfuric acid", true, false, "#3f8fd6"],
+        zncl2: ["zinc chloride", "ZnCl₂", "zinc + hydrochloric acid", true, false, "#ffffff"],
+        mgso4: ["magnesium sulfate", "MgSO₄", "magnesium carbonate + sulfuric acid", true, false, "#ffffff"],
+        nacl: ["sodium chloride", "NaCl", "sodium hydroxide + hydrochloric acid", true, true, "#ffffff"],
+        kno3: ["potassium nitrate", "KNO₃", "potassium hydroxide + nitric acid", true, true, "#ffffff"],
+        baso4: ["barium sulfate", "BaSO₄", "barium chloride + sodium sulfate solutions", false, false, "#ffffff"],
+        agcl: ["silver chloride", "AgCl", "silver nitrate + sodium chloride solutions", false, false, "#f2f2f2"],
+      };
+      const METH = { excess: "1 · Excess solid, filter", titr: "2 · Titration", prec: "3 · Precipitation" };
+      let salt = "cuso4", meth = "excess", step = -1, result = null, heated = false, wet = false, timer = 0;
+      const r = shell(`${pickRow("st", "Make", Object.entries(SALT).map(([k, s]) => [k, s[0]]), salt)}
+        ${pickRow("me", "Method", Object.entries(METH), meth)}
+        <svg class="scene" viewBox="0 0 340 220" role="img" aria-label="Three stations: reaction, filtering, crystallising"><g id="line"></g></svg>
+        <div class="ctrl"><button id="go">▶️ Make it</button><button id="heat">🔥 Heat the crystals hard</button><button id="water">💧 Add a drop of water</button></div>
+        <div class="readout"><span class="chip" id="r1" style="white-space:normal"></span><span class="chip" id="r2" style="white-space:normal"></span></div>
+        <p class="muted" id="msg">Pick a salt and a method. Any method — see what happens.</p>`);
+      const fit = k => { const s = SALT[k]; return !s[3] ? "prec" : s[4] ? "titr" : "excess"; };
+      function info() { const s = SALT[salt]; el("r1").textContent = `${s[1]}: ${s[3] ? "soluble" : "insoluble"}${s[4] ? ", a sodium/potassium salt" : ""}`; el("r2").textContent = `start from: ${s[2]}`; }
+      wirePick("st", k => { salt = k; step = -1; result = null; heated = wet = false; info(); say(`${SALT[salt][0]}: read the name backwards — ${SALT[salt][2]}.`); });
+      wirePick("me", k => { meth = k; step = -1; result = null; heated = wet = false; });
+      el("go").onclick = () => { step = 0; timer = 0; result = null; heated = wet = false; say(stepText(0)); };
+      el("heat").onclick = () => {
+        if (result !== "ok" || SALT[salt][4] || salt !== "cuso4") return say(result === "ok" ? "Only the copper(II) sulfate crystals change colour when heated. Make those." : "Make some crystals first.");
+        heated = true; wet = false; if (api.found("anhydrous")) say("Blue to white. Heating drives off the water of crystallisation: CuSO₄·5H₂O → CuSO₄ + 5H₂O. Anhydrous copper(II) sulfate is white.");
+      };
+      el("water").onclick = () => {
+        if (!heated) return say("Heat the crystals first.");
+        heated = false; wet = true; if (api.found("rehydrate")) say("Blue again, and it gets warm. Adding water back is exothermic — the reverse of the heating.");
+      };
+      function stepText(i) {
+        const s = SALT[salt], ok = fit(salt) === meth;
+        const T = {
+          excess: [`Warm the acid and add the solid in excess, until some stays at the bottom.`, `Filter: the excess solid stays on the paper; the salt solution runs through.`, `Heat to the crystallisation point, cool slowly, filter and dry.`],
+          titr: [`Titrate to find the volumes, then repeat with no indicator.`, `Nothing to filter — both reagents were dissolved.`, `Heat to the crystallisation point, cool slowly, filter and dry.`],
+          prec: [`Mix the two solutions.`, `Filter — keep the residue on the paper, wash it with distilled water.`, `Dry the solid in a warm oven.`],
+        }[meth][i];
+        if (ok) return T;
+        if (meth === "prec" && s[3]) return i === 0 ? "Mix two solutions… nothing appears. The salt is soluble, so it stays dissolved." : i === 1 ? "Filter: nothing on the paper. Your salt ran straight through into the filtrate you were told to throw away." : "Nothing to dry.";
+        if (meth === "excess" && s[4]) return i === 0 ? `Add ${s[0].split(" ")[0]} compound in excess… it all dissolves. There is never solid left at the bottom to show the acid is used up.` : i === 1 ? "Filter: nothing to filter off. Any excess is dissolved and goes straight through." : "The crystals come out mixed with whatever was in excess. Not pure.";
+        if (meth === "titr" && !s[4] && s[3]) return i === 0 ? `The starting solid does not dissolve, so it cannot go in a burette or a pipette.` : i === 1 ? "There is no solution to titrate." : "Method 1 is the way for this salt: excess solid, then filter.";
+        if (!s[3]) return i === 0 ? (meth === "excess" ? `The ${s[0]} is insoluble — it coats the solid and the reaction stops.` : "As soon as the solutions mix a solid appears in the flask.") : i === 1 ? (meth === "excess" ? "Filter: your salt is stuck in the residue, mixed with unreacted solid." : "There is nothing to evaporate — the product is the solid, not a solution.") : "This salt is insoluble: make it by precipitation.";
+        return T;
+      }
+      info();
+      let last = performance.now();
+      (function loop(now) {
+        if (!alive(r)) return;
+        const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+        const s = SALT[salt], ok = fit(salt) === meth;
+        if (step >= 0 && step < 3) {
+          timer += dt;
+          if (timer > 2.6) { timer = 0; step++; if (step < 3) say(stepText(step)); else {
+            result = ok ? "ok" : "bad";
+            if (ok) { api.found({ excess: "excess", titr: "titrate", prec: "precip" }[meth]);
+              say(meth === "prec" ? `Pure, dry ${s[0]} — the one method where you keep the residue, washed before it is dried.` : `Crystals of ${s[0]}. ${meth === "excess" ? "The excess solid was your evidence that no acid was left." : "Exact volumes, so nothing was left over."}${salt === "cuso4" ? " Try heating them hard." : ""}`); }
+            else { api.found("wrongway"); say(`That method does not fit ${s[0]}. ${s[3] ? (s[4] ? "Sodium, potassium and ammonium salts are made by titration." : "Soluble, not sodium or potassium: excess solid, then filter.") : "Insoluble: precipitation."}`); } } }
+        }
+        const on = i => step === i ? "#b4531f" : "#9aa6b3", lab = (x, t) => `<text x="${x}" y="214" text-anchor="middle" font-size="12" class="lbl">${t}</text>`;
+        const reacting = step === 0, sol = s[0].startsWith("copper") ? "#7fb6e6" : "#e8f1f8";
+        const precipOk = meth === "prec" && !s[3];
+        let g = "";
+        // station 1: beaker
+        g += `<rect x="8" y="34" width="104" height="164" rx="8" fill="none" stroke="${on(0)}" stroke-width="${step === 0 ? 3 : 1.5}"/>
+          <path d="M28 70 V170 Q28 178 36 178 H84 Q92 178 92 170 V70" fill="#ffffff" fill-opacity=".4" stroke="#7f8c99" stroke-width="3"/>
+          <rect x="31" y="110" width="58" height="66" rx="4" fill="${step >= 0 ? (precipOk ? "#eef1f6" : sol) : "#e8f1f8"}"/>
+          ${step >= 0 && meth === "excess" && !s[4] ? `<ellipse cx="60" cy="172" rx="18" ry="4" fill="${salt === "cuso4" ? "#2b2b2b" : "#cfd8e2"}"/>` : ""}
+          ${step >= 0 && precipOk ? Array.from({ length: 22 }, (_, i) => `<circle cx="${36 + (i * 37) % 50}" cy="${116 + (i * 53) % 56}" r="2" fill="#ffffff" stroke="#9aa6b3" stroke-width=".6"/>`).join("") : ""}
+          ${reacting && meth === "titr" ? `<rect x="54" y="4" width="10" height="60" fill="#ffffff" stroke="#7f8c99"/>` : ""}`;
+        g += lab(60, meth === "prec" ? "mix" : meth === "titr" ? "titrate" : "react");
+        // station 2: filter
+        const fx = 170, resid = step >= 1 && ((meth === "excess" && !s[4]) || precipOk);
+        g += `<rect x="118" y="34" width="104" height="164" rx="8" fill="none" stroke="${on(1)}" stroke-width="${step === 1 ? 3 : 1.5}"/>
+          <path d="M${fx - 34} 60 L${fx} 110 L${fx + 34} 60 Z" fill="#f4f1ea" stroke="#7f8c99" stroke-width="2.5"/><path d="M${fx} 110 V136" stroke="#7f8c99" stroke-width="5"/>
+          ${resid ? `<path d="M${fx - 14} 92 L${fx} 108 L${fx + 14} 92 Z" fill="${precipOk ? "#ffffff" : salt === "cuso4" ? "#2b2b2b" : "#cfd8e2"}" stroke="#7f8c99"/>` : ""}
+          <path d="M${fx - 24} 140 V186 Q${fx - 24} 192 ${fx - 18} 192 H${fx + 18} Q${fx + 24} 192 ${fx + 24} 186 V140" fill="none" stroke="#7f8c99" stroke-width="2.5"/>
+          ${step >= 1 ? `<rect x="${fx - 21}" y="166" width="42" height="24" fill="${precipOk ? "#eef1f6" : sol}"/>` : ""}`;
+        g += lab(fx, meth === "prec" ? "filter, keep residue" : "filter");
+        // station 3: crystals
+        const cx = 280, made = step >= 2;
+        const crys = heated ? "#f4f4f4" : s[5];
+        g += `<rect x="228" y="34" width="104" height="164" rx="8" fill="none" stroke="${on(2)}" stroke-width="${step === 2 ? 3 : 1.5}"/>
+          <path d="M${cx - 38} 120 Q${cx} 160 ${cx + 38} 120" fill="#e6e2d6" stroke="#7f8c99" stroke-width="2.5"/>
+          ${step === 2 && meth !== "prec" ? `<path d="M${cx - 8} 178 Q${cx - 10} 164 ${cx} ${156 + Math.sin(now / 90) * 3} Q${cx + 10} 164 ${cx + 8} 178 Z" fill="#f2b705"/>` : ""}
+          ${made && ok && meth === "prec" ? `<ellipse cx="${cx}" cy="128" rx="24" ry="5" fill="${crys}" stroke="#9aa6b3"/>` : ""}
+          ${made && ok && meth !== "prec" ? Array.from({ length: 7 }, (_, i) => `<path d="M${cx - 24 + i * 8} ${130 - (i % 2) * 4} l5 -8 l5 8 l-5 8 z" fill="${crys}" stroke="#5b6675" stroke-width="1"/>`).join("") : ""}
+          ${result === "bad" ? `<text x="${cx}" y="100" text-anchor="middle" font-size="22">✗</text>` : ""}
+          ${heated ? `<text x="${cx}" y="96" text-anchor="middle" font-size="12" class="lbl">anhydrous</text>` : wet ? `<text x="${cx}" y="96" text-anchor="middle" font-size="12" class="lbl">hydrated, warm</text>` : ""}`;
+        g += lab(cx, meth === "prec" ? "wash, dry" : "crystallise");
+        g += `<text x="170" y="22" text-anchor="middle" font-size="13" font-weight="bold">${s[0]}, ${s[1]}</text>`;
+        el("line").innerHTML = g;
+        requestAnimationFrame(loop);
+      })(performance.now());
+    }
+
+    draw();
+  },
+});
+
+// Kinetic Lab — Grade 9 (IGCSE 1) Unit 1, States of Matter.
+//
+// Four benches: a flask of particles you heat and cool while the heating curve draws itself and a
+// meter says where the energy is going (faster particles, or pulling them apart); a sealed syringe
+// in a water bath whose wall hits you can count; a crystal that spreads through water, air or a
+// solid with no stirring; and the ammonia / hydrogen chloride tube, where you predict the ring.
+//
+// Layout rules (agent-contract §6): every drawing is an svg.scene inside its own viewBox, labels at
+// 12 units or more, readouts in HTML chips, option pickers in .ctrl.pick.
+ARCADE.toy({
+  id: "g9-igcse1-u01-kinetic", unit: "g9-igcse1-u01", order: 1,
+  name: "Kinetic Lab", icon: "🌡️",
+  blurb: "Heat a mystery solid, squash a gas, and race two gases down a tube",
+  discoveries: [
+    ["meltflat", "Flat while melting", "Keep heating while the solid melts"],
+    ["boilflat", "Flat while boiling", "Keep heating while the liquid boils"],
+    ["gas", "All gas", "Heat until every particle is free"],
+    ["condense", "Condensing", "Cool the gas back into a liquid"],
+    ["freeze", "Freezing", "Cool the liquid until it is solid again"],
+    ["evap", "Evaporation cools", "Take the lid off a liquid and watch the temperature"],
+    ["mystery", "Named by its curve", "Read Substance X's melting and boiling points"],
+    ["hotter", "Hot gas grows", "Put the free syringe in hot water"],
+    ["colder", "Cold gas shrinks", "Put the free syringe in ice water"],
+    ["squeeze", "Double the pressure", "Hold the plunger and push it to half the volume"],
+    ["heldhot", "Pressure builds", "Hold the plunger still and heat the gas"],
+    ["release", "Pressures balance", "Let go of a squeezed plunger"],
+    ["spread", "Spreads on its own", "Watch the purple spread with no stirring"],
+    ["even", "Evenly spread", "Wait until the colour is even all through"],
+    ["warm", "Faster when warm", "Let it spread in warm water"],
+    ["gasfast", "Gases are faster", "Let it spread through air"],
+    ["solid", "Stuck in a solid", "Try it in a solid"],
+    ["stir", "That's stirring", "Stir it, and see what diffusion is not"],
+    ["ring", "White ring", "Let ammonia and hydrogen chloride meet"],
+    ["predict", "Called it", "Predict where the ring forms, to within 5 cm"],
+    ["swap", "Same answer, other side", "Swap the ends and run it again"],
+    ["warmtube", "Sooner, same place", "Run the tube warm"],
+  ],
+  mount(root, api) {
+    const rand = (a, b) => a + Math.random() * (b - a);   // api.rnd(n) is a whole number below n
+    const randn = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+    let tab = "curve", run = 0;
+    const alive = r => r === run && document.body.contains(root);
+    const tabs = [["curve", "🌡️ Heating curve"], ["syringe", "💨 Gas syringe"], ["spread", "🟣 Spreading"], ["tube", "🧪 Gas race"]];
+    const el = id => document.getElementById(id);
+    const say = m => { const p = el("msg"); if (p && p.textContent !== m) { p.textContent = m; api.say(m); } };
+    function shell(inner) {
+      run++;
+      root.innerHTML = `<div class="ctrl tabs">${tabs.map(([k, n]) =>
+        `<button data-tab="${k}" class="${k === tab ? "on" : ""}">${n}</button>`).join("")}</div><div id="bench">${inner}</div>`;
+      root.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { tab = b.dataset.tab; draw(); });
+      return run;
+    }
+    function draw() { ({ curve: curveBench, syringe: syringeBench, spread: spreadBench, tube: tubeBench })[tab](); }
+    const pickRow = (attr, label, opts, on) => `<div class="ctrl pick"><span class="lead">${label}</span>${opts.map(([k, n]) =>
+      `<button data-${attr}="${k}" class="${k === on ? "on" : ""}">${n}</button>`).join("")}</div>`;
+    const wirePick = (attr, fn) => root.querySelectorAll(`[data-${attr}]`).forEach(b => b.onclick = () => {
+      root.querySelectorAll(`[data-${attr}]`).forEach(o => o.classList.toggle("on", o === b)); fn(b.dataset[attr]); });
+
+    // ── heating and cooling curve ───────────────────────────────────────
+    // Energy E is stored in "degrees' worth". Temperature follows E, except across the two latent
+    // stretches where E climbs and the temperature does not — that is the whole point of the bench.
+    function curveBench() {
+      const SUB = { water: ["Water", 0, 100], ethanol: ["Ethanol", -114, 78], x: ["Substance X", 80, 218] };
+      const LM = 60, LB = 150, RATE = 12, N = 30;
+      let pick = "water", E = 0, heating = false, cooling = false, lid = true, t = 0, pts = [], marks = [], seen = {}, gone = 0, evapAt = 0, evapT0 = null;
+      let P = [];
+      const r = shell(`${pickRow("s", "Substance", Object.entries(SUB).map(([k, s]) => [k, s[0]]), pick)}
+        <div class="duo">
+          <svg class="scene" viewBox="0 0 240 230" role="img" aria-label="A flask of particles on a heater, with a thermometer">
+            <rect x="18" y="20" width="204" height="182" rx="6" class="bgc" stroke="#9aa6b3" stroke-width="3"/>
+            <g id="lid"></g><g id="pp"></g>
+            <rect x="10" y="206" width="220" height="16" rx="4" id="plate" fill="#8d97a3"/></svg>
+          <svg class="scene" viewBox="0 0 260 230" role="img" aria-label="Temperature against time, drawn as you heat and cool"><g id="graph"></g></svg></div>
+        <div class="ctrl"><button id="hot">🔥 Heat</button><button id="cold">❄️ Cool</button><button id="lidb">🫙 Take the lid off</button><button id="again">🔄 Start again</button></div>
+        <div class="readout"><span class="chip" id="therm"></span><span class="chip" id="r1"></span><span class="chip" id="r2"></span><span class="chip" id="r3"></span></div>
+        <p class="muted" id="msg"></p>`);
+      const S = () => SUB[pick], base = () => S()[1] - 30;
+      const bEdge = () => (S()[1] - base()) + LM + (S()[2] - S()[1]);
+      const EMAX = () => bEdge() + LB + 40;
+      function state() {
+        const s = S(), a = s[1] - base(), b = bEdge();
+        if (E < a) return { T: base() + E, melt: 0, boil: 0 };
+        if (E < a + LM) return { T: s[1], melt: (E - a) / LM, boil: 0 };
+        if (E < b) return { T: s[1] + (E - a - LM), melt: 1, boil: 0 };
+        if (E < b + LB) return { T: s[2], melt: 1, boil: (E - b) / LB };
+        return { T: s[2] + (E - b - LB), melt: 1, boil: 1 };
+      }
+      const slot = i => ({ x: 120 + ((i % 6) - 2.5) * 14, y: 194 - Math.floor(i / 6) * 14 });
+      function reset(m) {
+        E = 0; t = 0; pts = []; marks = []; seen = {}; gone = 0; evapT0 = null; heating = cooling = false; lid = true;
+        P = Array.from({ length: N }, (_, i) => { const s = slot(i); return { x: s.x, y: s.y, vx: 0, vy: 0, out: false, ph: rand(0, 6.3) }; });
+        el("hot").classList.remove("on"); el("cold").classList.remove("on");
+        say(m || `${S()[0]} as a solid, ${base()} °C. Heat it and watch the graph.`);
+      }
+      wirePick("s", k => { pick = k; reset(); });
+      el("hot").onclick = () => { heating = !heating; cooling = false; el("hot").classList.toggle("on", heating); el("cold").classList.remove("on"); };
+      el("cold").onclick = () => { cooling = !cooling; heating = false; el("cold").classList.toggle("on", cooling); el("hot").classList.remove("on"); };
+      el("lidb").onclick = () => {
+        const st = state();
+        if (lid && st.boil > 0) return say("Keep the lid on while there is gas — we want to cool it back down later.");
+        lid = !lid; evapT0 = lid ? null : st.T; evapAt = t;
+        if (!lid) say(st.melt === 1 ? "Lid off. Watch the surface — and the thermometer." : "Lid off. A solid's particles cannot escape. Try it once it has melted.");
+        else say("Lid back on.");
+      };
+      el("again").onclick = () => reset();
+      reset();
+      let last = performance.now(), acc = 0;
+      (function loop(now) {
+        if (!alive(r)) return;
+        const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+        const s = S();
+        if (heating) E = Math.min(EMAX(), E + RATE * dt);
+        if (cooling) E = Math.max(0, E - RATE * dt);
+        if (heating || cooling) t += dt;
+        let st = state();
+        if (st.boil > 0 && !lid) { lid = true; evapT0 = null; }
+        // Evaporation: with the lid off and nothing heating, the fastest particle at the surface leaves
+        // every couple of seconds and takes its energy with it, so the liquid left behind cools.
+        if (!lid && !heating && st.melt === 1 && st.boil === 0 && gone < 8 && now / 1000 - evapAt > 1.6) {
+          const live = P.filter(p => !p.out), top = live.reduce((a, p) => p.y < a.y ? p : a, live[0]);
+          top.out = true; top.vy = -160; top.vx = rand(-40, 40); gone++; evapAt = now / 1000; E = Math.max(0, E - 3); t += 0.4; st = state();
+          if (evapT0 !== null && evapT0 - st.T >= 5 && api.found("evap")) say("Only the fastest particles escape from the surface. The ones left are slower on average, so the temperature falls. That is why sweat cools you.");
+        }
+        acc += dt;
+        if ((heating || cooling || (!lid && gone)) && acc > 0.25) { acc = 0; pts.push([t, st.T]); if (pts.length > 600) pts.shift(); }
+        // plateau marks and discoveries
+        const mark = (k, text, T) => { if (!seen[k]) { seen[k] = true; marks.push([t, T, text]); } };
+        if (heating && st.melt > 0.3 && st.melt < 0.8) { mark("hm", "melting", s[1]); if (api.found("meltflat")) say("The heat is still going in, but the temperature has stopped. The energy is pulling particles out of their fixed positions, not making them faster."); }
+        if (heating && st.boil > 0.3 && st.boil < 0.8) { mark("hb", "boiling", s[2]); if (api.found("boilflat")) say("Flat again, at the boiling point. Now the energy separates the particles completely. Liquid and gas are both there."); }
+        if (st.boil === 1) { seen.allgas = true; if (api.found("gas")) say("Every particle is free and moving fast in all directions. Now try cooling it."); }
+        if (cooling && st.boil > 0 && st.boil < 0.6 && seen.allgas) { mark("cb", "condensing", s[2]); if (api.found("condense")) say("Cooling, and flat at the boiling point. As forces of attraction re-form they release energy, which holds the temperature steady. This plateau is condensing."); }
+        if (st.melt === 1 && st.boil === 0) seen.liq = true;
+        if (cooling && st.melt > 0 && st.melt < 0.6 && seen.liq) { mark("cm", "freezing", s[1]); if (api.found("freeze")) say("The lower plateau on a cooling curve is freezing. Same shape as heating — check the direction before you name it."); }
+        if (pick === "x" && seen.hm && seen.hb && api.found("mystery")) say("X melts at 80 °C and boils at 218 °C — that is naphthalene. A pure substance has one fixed melting point and one fixed boiling point.");
+        // particles: who is solid, liquid or gas right now
+        const live = P.filter(p => !p.out), n = live.length;
+        const nSolid = Math.round(n * (1 - st.melt)), nGas = Math.round(n * st.boil);
+        const TK = st.T + 273, sp = 70 * Math.sqrt(TK / 300);
+        live.forEach((p, i) => { p.st = i < nSolid ? "s" : i >= n - nGas ? "g" : "l"; });
+        live.forEach((p, i) => {
+          if (p.st === "s") {
+            const sl = slot(i), amp = 0.6 + 2.2 * Math.max(0, (st.T - base()) / (s[1] - base() || 1));
+            p.ph += dt * 18; p.x += (sl.x - p.x) * Math.min(1, dt * 8) + Math.sin(p.ph) * amp * 0.5; p.y += (sl.y - p.y) * Math.min(1, dt * 8) + Math.cos(p.ph * 1.3) * amp * 0.5; p.vx = p.vy = 0;
+          } else if (p.st === "l") {
+            p.vy += 260 * dt; p.vx += randn() * sp * 2 * dt; p.vy += randn() * sp * 2 * dt; p.vx *= 0.96; p.vy *= 0.96;
+          } else {
+            const v = Math.hypot(p.vx, p.vy) || 1, want = sp * 1.6; p.vx = p.vx / v * want; p.vy = p.vy / v * want;
+            if (v < 2) { const a = rand(0, 6.3); p.vx = Math.cos(a) * want; p.vy = Math.sin(a) * want; }
+          }
+        });
+        // liquid particles keep touching but do not overlap
+        for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+          const a = live[i], b = live[j]; if (a.st === "g" || b.st === "g") continue;
+          const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+          if (d > 0 && d < 12.5) { const push = (12.5 - d) / 2, ux = dx / d, uy = dy / d;
+            if (a.st === "l") { a.x -= ux * push; a.y -= uy * push; } if (b.st === "l") { b.x += ux * push; b.y += uy * push; } }
+        }
+        live.forEach(p => {
+          if (p.st === "s") return;
+          p.x += p.vx * dt; p.y += p.vy * dt;
+          if (p.x < 26) { p.x = 26; p.vx = Math.abs(p.vx); } if (p.x > 214) { p.x = 214; p.vx = -Math.abs(p.vx); }
+          if (p.y > 194) { p.y = 194; p.vy = -Math.abs(p.vy) * (p.st === "g" ? 1 : 0.3); } if (p.y < 28) { p.y = 28; p.vy = Math.abs(p.vy); }
+        });
+        P.filter(p => p.out).forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; });
+        el("pp").innerHTML = P.filter(p => p.y > -10).map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="6" fill="${p.out ? "#9ad0f0" : p.st === "s" ? "#2f6f9f" : p.st === "l" ? "#3d8bc4" : "#8cc2e8"}" stroke="#ffffff" stroke-width="1"/>`).join("");
+        el("lid").innerHTML = lid ? `<rect x="12" y="12" width="216" height="10" rx="3" fill="#7f8c99"/>` : `<rect x="186" y="2" width="44" height="8" rx="3" fill="#7f8c99" transform="rotate(14 208 6)"/>`;
+        el("plate").setAttribute("fill", heating ? "#d64545" : cooling ? "#5aa9e6" : "#8d97a3");
+        el("therm").textContent = `🌡️ ${Math.round(st.T)} °C`;
+        // graph
+        const lo = base() - 5, hi = s[2] + 45, tmax = Math.max(40, t + 4);
+        const X = v => 36 + (v / tmax) * 212, Y = T => 196 - ((T - lo) / (hi - lo)) * 176;
+        let g = `<path d="M36 18 V196 H250" fill="none" stroke="#5b6675" stroke-width="2"/>
+          <text x="143" y="222" text-anchor="middle" font-size="12" class="lbl">time</text>
+          <text x="12" y="110" text-anchor="middle" font-size="12" class="lbl" transform="rotate(-90 12 110)">temperature / °C</text>`;
+        [s[1], s[2]].forEach(T => { if (seen.hm && T === s[1] || seen.hb && T === s[2] || seen.cb && T === s[2] || seen.cm && T === s[1])
+          g += `<path d="M36 ${Y(T)} H250" stroke="#9aa6b3" stroke-dasharray="4 4"/><text x="32" y="${Y(T) + 4}" text-anchor="end" font-size="12" class="lbl">${T}</text>`; });
+        if (pts.length > 1) g += `<polyline points="${pts.map(([a, b]) => `${X(a).toFixed(1)},${Y(b).toFixed(1)}`).join(" ")}" fill="none" stroke="#d64545" stroke-width="2.5"/>`;
+        marks.forEach(([a, T, text]) => { const below = text === "condensing" || text === "freezing"; g += `<text x="${Math.min(244, X(a) + 2)}" y="${Y(T) + (below ? 16 : -6)}" text-anchor="${X(a) > 190 ? "end" : "start"}" font-size="12" fill="#b4531f">${text}</text>`; });
+        el("graph").innerHTML = g;
+        const plateau = (st.melt > 0 && st.melt < 1) || (st.boil > 0 && st.boil < 1);
+        el("r1").textContent = st.boil === 1 ? "gas" : st.boil > 0 ? "liquid + gas" : st.melt === 1 ? "liquid" : st.melt > 0 ? "solid + liquid" : "solid";
+        el("r2").textContent = heating ? (plateau ? "energy in → pulling particles apart" : "energy in → particles move faster")
+          : cooling ? (plateau ? "forces re-forming → energy released" : "energy out → particles slow down") : "insulated: no heat in or out";
+        el("r3").textContent = gone ? `${gone} particle${gone > 1 ? "s" : ""} evaporated` : `${n} particles, none changed in size`;
+        requestAnimationFrame(loop);
+      })(performance.now());
+    }
+
+    // ── gas syringe ─────────────────────────────────────────────────────
+    // Pressure comes from particles hitting the walls; the chip counts the hits in the last second.
+    // "Free" lets the plunger settle where inside pressure equals outside; "Hold" lets you push it.
+    function syringeBench() {
+      const N = 22, VREF = 150, L = 22;
+      let mode = "free", bath = 20, T = 20, px = L + VREF, held = null, hits = [], P = [];
+      const r = shell(`${pickRow("m", "Plunger", [["free", "🆓 Free to move"], ["hold", "✋ I hold it"]], mode)}
+        ${pickRow("b", "Water bath", [["0", "❄️ Ice water 0 °C"], ["20", "🌡️ Room 20 °C"], ["80", "♨️ Hot water 80 °C"]], "20")}
+        <svg class="scene" viewBox="0 40 340 156" role="img" aria-label="A sealed syringe of air lying in a water bath">
+          <rect id="bathw" x="6" y="96" width="328" height="96" rx="6" fill="#dbeaf6"/>
+          <text x="14" y="184" font-size="12" class="lbl" id="bathl"></text>
+          <g id="syr"></g></svg>
+        <div class="ctrl" id="pushrow"><button id="pin">⬅️ Push in</button><button id="pout">➡️ Pull out</button></div>
+        <div class="readout"><span class="chip" id="r1"></span><span class="chip" id="r2"></span><span class="chip" id="r3"></span><span class="chip" id="r4"></span></div>
+        <p class="muted" id="msg">A sealed syringe of air. The plunger is free, so it sits where the pressure inside equals the air pressure outside.</p>`);
+      P = Array.from({ length: N }, () => { const a = rand(0, 6.3); return { x: rand(L + 6, px - 6), y: rand(68, 112), a, f: 0 }; });
+      const pressure = () => ((T + 273) / 293) * (VREF / (px - L));
+      wirePick("m", k => {
+        const was = mode; mode = k; el("pushrow").hidden = mode !== "hold";
+        if (mode === "hold") { held = { px, T }; say("You are holding the plunger. Push it in or pull it out."); }
+        else if (was === "hold") { const p = pressure(); held = null;
+          if (p > 1.3 && api.found("release")) say("Let go and the plunger springs back out until the pressure inside equals the pressure outside again.");
+          else say("Let go: the plunger settles where the pressures balance."); }
+      });
+      wirePick("b", k => { bath = +k; say(bath === 80 ? "Into hot water…" : bath === 0 ? "Into ice water…" : "Back to room temperature."); });
+      el("pushrow").hidden = true;
+      const nudge = d => { if (mode !== "hold") return; px = Math.max(L + 55, Math.min(L + 228, px + d)); held = { px, T };
+        const p = pressure();
+        if (p >= 1.95 && api.found("squeeze")) say("Half the volume, and the pressure has doubled. The same particles in half the space hit the walls twice as often.");
+        else say(d < 0 ? "Smaller space: the particles hit the walls more often. Pressure up." : "More room: fewer hits on the walls each second. Pressure down."); };
+      el("pin").onclick = () => nudge(-15); el("pout").onclick = () => nudge(15);
+      let last = performance.now();
+      (function loop(now) {
+        if (!alive(r)) return;
+        const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+        T += (bath - T) * Math.min(1, dt * 0.8);
+        if (mode === "free") {
+          const target = L + VREF * (T + 273) / 293; px += (target - px) * Math.min(1, dt * 2.5);
+          if (bath === 80 && T > 70 && api.found("hotter")) say("The particles move faster and hit the walls harder and more often. The plunger is pushed out until the pressures balance — a bigger volume.");
+          if (bath === 0 && T < 3 && api.found("colder")) say("Slower particles hit the walls less often and less hard, so the outside air pushes the plunger in. Smaller volume.");
+        } else if (held && bath > 20 && T > 60 && pressure() > 1.12 && api.found("heldhot")) say("Same volume, hotter gas: more frequent, harder collisions with the walls. The pressure rises — you can feel the plunger pushing back.");
+        const sp = 95 * Math.sqrt((T + 273) / 293);
+        P.forEach(p => {
+          p.x += Math.cos(p.a) * sp * dt; p.y += Math.sin(p.a) * sp * dt; p.f = Math.max(0, p.f - dt * 4);
+          let hit = false;
+          if (p.x < L + 4) { p.x = L + 4; p.a = Math.PI - p.a; hit = true; }
+          if (p.x > px - 4) { p.x = px - 4; p.a = Math.PI - p.a; hit = true; }
+          if (p.y < 64) { p.y = 64; p.a = -p.a; hit = true; }
+          if (p.y > 116) { p.y = 116; p.a = -p.a; hit = true; }
+          if (hit) { hits.push(now); p.f = 1; }
+        });
+        while (hits.length && hits[0] < now - 1000) hits.shift();
+        const bc = T > 40 ? "#f6d3c4" : T < 8 ? "#cfe6f7" : "#dbeaf6";
+        el("bathw").setAttribute("fill", bc);
+        el("bathl").textContent = `water bath ${bath} °C`;
+        el("syr").innerHTML = `<rect x="${L - 2}" y="58" width="${L + 236}" height="64" rx="4" fill="#ffffff" fill-opacity=".55" stroke="#7f8c99" stroke-width="3"/>
+          <rect x="4" y="80" width="${L - 6}" height="20" rx="3" fill="#7f8c99"/><text x="10" y="50" font-size="12" class="lbl">sealed</text>
+          ${Array.from({ length: 9 }, (_, i) => `<path d="M${L + 25 + i * 25} 58 V66" stroke="#7f8c99" stroke-width="1.5"/>`).join("")}
+          ${P.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="#2f6f9f"/>${p.f > 0.5 ? `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${4 + (1 - p.f) * 10}" fill="none" stroke="#b4531f" stroke-width="1.5" opacity="${p.f}"/>` : ""}`).join("")}
+          <rect x="${px}" y="60" width="9" height="60" fill="#5b6675"/><rect x="${px + 9}" y="86" width="${330 - px - 24}" height="8" fill="#9aa6b3"/>
+          <rect x="${306 - 0}" y="66" width="10" height="48" rx="3" fill="#5b6675"/>
+          ${mode === "hold" ? `<text x="311" y="54" text-anchor="middle" font-size="18">✋</text>` : ""}
+          <text x="${(L + px) / 2}" y="140" text-anchor="middle" font-size="12" class="lbl">volume ${Math.round((px - L) / VREF * 100)} cm³</text>`;
+        el("r1").textContent = `gas ${Math.round(T)} °C`;
+        el("r2").textContent = `${hits.length} wall hits / second`;
+        el("r3").textContent = `pressure inside ${pressure().toFixed(2)} atm`;
+        el("r4").textContent = "outside 1.00 atm";
+        requestAnimationFrame(loop);
+      })(performance.now());
+    }
+
+    // ── spreading: diffusion in a liquid, a gas and a solid ─────────────
+    function spreadBench() {
+      const MED = {
+        water: ["💧 Water", 14, 22, "#e3f0fa", "time-lapse: 1 s here ≈ 10 minutes", "#7b2d8b"],
+        air: ["🌫️ Air", 52, 78, "#f4f1ea", "real time", "#a0522d"],
+        solid: ["🧊 Solid", 0, 0, "#e9edf2", "time-lapse", "#7b2d8b"],
+      };
+      const N = 140, X0 = 60, X1 = 280, Y0 = 46, Y1 = 196;
+      let med = "water", warmth = "cold", D = [], t = 0, stirred = false, freed = 0;
+      const r = shell(`${pickRow("md", "Spread through", Object.entries(MED).map(([k, m]) => [k, m[0]]), med)}
+        ${pickRow("w", "Temperature", [["cold", "Cold"], ["warm", "Warm"]], warmth)}
+        <svg class="scene" viewBox="0 0 340 220" role="img" aria-label="A container with a coloured crystal at the bottom"><g id="box"></g></svg>
+        <div class="ctrl"><button id="fresh">🔄 Fresh crystal</button><button id="stirb">🥄 Stir</button></div>
+        <div class="readout"><span class="chip" id="r1"></span><span class="chip" id="r2"></span></div>
+        <p class="muted" id="msg"></p>`);
+      function fresh(m) {
+        t = 0; stirred = false; freed = 0;
+        D = Array.from({ length: N }, () => ({ x: 170 + rand(-6, 6), y: Y1 - 6 + rand(-4, 2), free: false }));
+        const M = MED[med];
+        say(m || (med === "water" ? "A crystal of purple potassium manganate(VII) in still water. No stirring — just watch."
+          : med === "air" ? "A drop of brown bromine at the bottom of a gas jar of air. Lid on, no draught." : "A crystal set inside a solid block."));
+      }
+      wirePick("md", k => { med = k; fresh(); });
+      wirePick("w", k => { warmth = k; if (k === "warm") say("Warmer: the particles move faster."); });
+      el("fresh").onclick = () => fresh();
+      el("stirb").onclick = () => {
+        if (med === "solid") return say("You cannot stir a solid.");
+        stirred = true; D.forEach(d => { d.free = true; d.x = rand(X0 + 4, X1 - 4); d.y = rand(Y0 + 4, Y1 - 4); }); freed = N;
+        if (api.found("stir")) say("Even at once — but that was stirring, not diffusion. Diffusion needs no stirring and no draught: it happens on its own because the particles move randomly.");
+      };
+      fresh();
+      // How even is it? Coefficient of variation over a 5 × 4 grid, turned into 0–100 %.
+      function evenness() {
+        const c = new Array(20).fill(0);
+        D.forEach(d => { const i = Math.min(4, Math.floor((d.x - X0) / ((X1 - X0) / 5))), j = Math.min(3, Math.floor((d.y - Y0) / ((Y1 - Y0) / 4))); c[j * 5 + i]++; });
+        const mean = N / 20, sd = Math.sqrt(c.reduce((a, v) => a + (v - mean) ** 2, 0) / 20);
+        return Math.max(0, Math.min(1, 1 - (sd / mean) / Math.sqrt(19)));
+      }
+      let last = performance.now();
+      (function loop(now) {
+        if (!alive(r)) return;
+        const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now; t += dt;
+        const M = MED[med], k = warmth === "warm" ? M[2] : M[1];
+        if (freed < N && t > freed * 0.02) { D[freed].free = true; freed++; }
+        D.forEach(d => {
+          if (!d.free) return;
+          if (med === "solid") { d.x += randn() * 0.4; d.y += randn() * 0.4; return; }
+          d.x += randn() * k * Math.sqrt(dt); d.y += randn() * k * Math.sqrt(dt);
+          if (d.x < X0 + 3) d.x = 2 * (X0 + 3) - d.x; if (d.x > X1 - 3) d.x = 2 * (X1 - 3) - d.x;
+          if (d.y < Y0 + 3) d.y = 2 * (Y0 + 3) - d.y; if (d.y > Y1 - 3) d.y = 2 * (Y1 - 3) - d.y;
+          d.x = Math.max(X0 + 3, Math.min(X1 - 3, d.x)); d.y = Math.max(Y0 + 3, Math.min(Y1 - 3, d.y));
+        });
+        const ev = evenness();
+        if (!stirred) {
+          if (med !== "solid" && ev > 0.3 && api.found("spread")) say("Spreading out on its own: more particles happen to move away from the crowded region than into it. That net movement is diffusion.");
+          if (med !== "solid" && warmth === "warm" && ev > 0.5 && api.found("warm")) say("Warmer particles move faster, so they spread through each other more quickly. A smell crosses a warm room faster than a cold one.");
+          if (med === "air" && ev > 0.8 && api.found("gasfast")) say("Seconds, not hours. Gas particles are far apart and travel a long way between collisions; liquid particles are always bumping into their neighbours.");
+          if (ev > 0.8 && api.found("even")) say("Evenly spread. The particles still move, but now as many go one way as the other — no more net movement.");
+          if (med === "solid" && t > 6 && api.found("solid")) say("Nothing spreads. In a solid the particles only vibrate about fixed positions — they cannot change places, so there is no diffusion.");
+        }
+        const jar = med === "air";
+        el("box").innerHTML = `<rect x="${X0}" y="${Y0}" width="${X1 - X0}" height="${Y1 - Y0}" fill="${M[3]}"/>
+          ${med === "solid" ? Array.from({ length: 6 }, (_, i) => `<path d="M${X0 + 20 + i * 36} ${Y0 + 10} l14 30" stroke="#ffffff" stroke-width="3" opacity=".8"/>`).join("") : ""}
+          ${D.map(d => `<circle cx="${d.x.toFixed(1)}" cy="${d.y.toFixed(1)}" r="3.2" fill="${M[5]}" opacity=".75"/>`).join("")}
+          ${freed < N ? `<rect x="164" y="${Y1 - 12}" width="12" height="10" fill="${M[5]}" transform="rotate(12 170 ${Y1 - 7})"/>` : ""}
+          ${jar ? `<path d="M${X0 - 4} ${Y0} V${Y1 + 4} H${X1 + 4} V${Y0}" fill="none" stroke="#7f8c99" stroke-width="4"/><rect x="${X0 - 12}" y="${Y0 - 12}" width="${X1 - X0 + 24}" height="10" rx="3" fill="#7f8c99"/>`
+            : med === "water" ? `<path d="M${X0 - 4} ${Y0 - 16} V${Y1 + 4} H${X1 + 4} V${Y0 - 16}" fill="none" stroke="#7f8c99" stroke-width="4"/><path d="M${X0} ${Y0} H${X1}" stroke="#5aa9e6" stroke-width="2"/>`
+              : `<rect x="${X0}" y="${Y0}" width="${X1 - X0}" height="${Y1 - Y0}" fill="none" stroke="#7f8c99" stroke-width="3"/>`}
+          <text x="170" y="${Y0 - 22}" text-anchor="middle" font-size="13" class="lbl">${jar ? "bromine in a gas jar of air" : med === "water" ? "potassium manganate(VII) in still water" : "crystal inside a solid"}</text>`;
+        el("r1").textContent = `${Math.round(ev * 100)} % even`;
+        el("r2").textContent = stirred ? "stirred" : M[4];
+        requestAnimationFrame(loop);
+      })(performance.now());
+    }
+
+    // ── gas race: the NH3 / HCl tube ────────────────────────────────────
+    // Each gas front advances as √t, ammonia √(36.5/17) ≈ 1.47 times faster. The ring forms where
+    // they meet: about 59 cm from the ammonia end of a 100 cm tube.
+    function tubeBench() {
+      const A = 40, B = 300, LEN = B - A, RATIO = Math.sqrt(36.5 / 17);
+      let nh3Left = true, warm = false, running = false, t = 0, met = null, guess = null, done = {}, dotsA = [], dotsB = [];
+      const r = shell(`${pickRow("tw", "Tube", [["room", "Room temperature"], ["warm", "Warm"]], "room")}
+        <svg class="scene" viewBox="0 34 340 136" id="tsvg" role="img" aria-label="A long glass tube with cotton wool at each end and a ruler underneath"><g id="tube"></g></svg>
+        <div class="ctrl"><button id="go">▶️ Put the bungs in</button><button id="swap">↔️ Swap the ends</button><button id="clean">🔄 Clean tube</button></div>
+        <div class="readout"><span class="chip" id="r1">NH₃ Mᵣ = 17</span><span class="chip" id="r2">HCl Mᵣ = 36.5</span><span class="chip" id="r3"></span></div>
+        <p class="muted" id="msg">Before you start: tap the tube where you think the white ring will form.</p>`);
+      const cm = x => Math.round((x - A) / LEN * 100);
+      const nh3x = f => nh3Left ? A + f : B - f, hclx = f => nh3Left ? B - f : A + f;
+      function clean(m) { running = false; t = 0; met = null; guess = null; dotsA = Array.from({ length: 46 }, () => rand(0, 1)); dotsB = Array.from({ length: 46 }, () => rand(0, 1)); say(m || "Clean, dry tube. Tap where you think the ring will form, then put the bungs in."); }
+      wirePick("tw", k => { warm = k === "warm"; clean(warm ? "A warm tube. Tap your prediction, then put the bungs in." : null); });
+      el("tsvg").onclick = e => {
+        if (running || met) return;
+        const pt = el("tsvg").createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+        const p = pt.matrixTransform(el("tsvg").getScreenCTM().inverse());
+        if (p.x < A || p.x > B) return;
+        guess = p.x; say(`Your prediction: ${cm(guess)} cm from the left. Now put the bungs in.`);
+      };
+      el("go").onclick = () => { if (running) return; if (met) clean(); running = true; say("Both cotton wools give off gas. Watch the two gases diffuse along the tube…"); };
+      el("swap").onclick = () => { nh3Left = !nh3Left; clean(`Swapped: ammonia is now on the ${nh3Left ? "left" : "right"}. Predict again.`); };
+      el("clean").onclick = () => clean();
+      clean();
+      let last = performance.now();
+      (function loop(now) {
+        if (!alive(r)) return;
+        const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+        const k = (warm ? 1.6 : 1) * LEN / (1 + RATIO) / Math.sqrt(12);
+        if (running) {
+          t += dt;
+          const fa = k * RATIO * Math.sqrt(t), fb = k * Math.sqrt(t);
+          if (fa + fb >= LEN) {
+            running = false; met = { x: nh3x(LEN * RATIO / (1 + RATIO)), t };
+            const fromN = Math.round(RATIO / (1 + RATIO) * 100), side = nh3Left ? "right" : "left";
+            done[nh3Left ? "L" : "R"] = true;
+            api.found("ring");
+            let m = `White ring of ammonium chloride, ${fromN} cm from the ammonia end — nearer the hydrogen chloride (${side}) end. Ammonia is lighter (Mᵣ 17), so at the same temperature it moves faster and travels further before they meet.`;
+            if (guess !== null && Math.abs(cm(guess) - cm(met.x)) <= 5 && api.found("predict")) m = `Called it — the ring formed at ${cm(met.x)} cm, you said ${cm(guess)}. ` + m;
+            if (done.L && done.R && api.found("swap")) m = "Ammonia on the other side, and the ring moved with it: it always forms nearer the slower gas, hydrogen chloride. " + m;
+            if (warm && api.found("warmtube")) m = `Warm tube: the ring appeared after ${t.toFixed(0)} s instead of about 12 s, but in the same place. Both gases sped up together, so the ratio is unchanged.`;
+            say(m);
+          }
+        }
+        const fa = met ? LEN * RATIO / (1 + RATIO) : k * RATIO * Math.sqrt(t), fb = met ? LEN / (1 + RATIO) : k * Math.sqrt(t);
+        const live = running || met;
+        let g = `<rect x="${A - 16}" y="58" width="${LEN + 32}" height="44" rx="10" fill="#ffffff" fill-opacity=".5" stroke="#7f8c99" stroke-width="3"/>`;
+        if (live) {
+          g += dotsA.map((u, i) => { const f = Math.max(0, fa * Math.sqrt(u) + (running ? rand(-2, 2) : 0)); return `<circle cx="${nh3x(f).toFixed(1)}" cy="${64 + ((i * 37) % 32)}" r="2.6" fill="#2f6f9f"/>`; }).join("");
+          g += dotsB.map((u, i) => { const f = Math.max(0, fb * Math.sqrt(u) + (running ? rand(-2, 2) : 0)); return `<circle cx="${hclx(f).toFixed(1)}" cy="${64 + ((i * 53) % 32)}" r="3.4" fill="#3c9a5f"/>`; }).join("");
+        }
+        if (met) g += `<rect x="${met.x - 5}" y="60" width="10" height="40" fill="#ffffff" stroke="#9aa6b3"/><text x="${met.x}" y="50" text-anchor="middle" font-size="13" font-weight="bold">white ring: NH₄Cl</text>`;
+        const cotton = (x, lab, col, right) => `<ellipse cx="${x}" cy="80" rx="13" ry="18" fill="#f7f7f7" stroke="#9aa6b3"/><rect x="${right ? x + 8 : x - 22}" y="66" width="14" height="28" rx="3" fill="#7f8c99"/>
+          <text x="${right ? 336 : 4}" y="122" text-anchor="${right ? "end" : "start"}" font-size="12" fill="${col}" font-weight="bold">${lab}</text>`;
+        g += cotton(A - 4, nh3Left ? "ammonia" : "hydrochloric acid", nh3Left ? "#2f6f9f" : "#3c9a5f", false)
+          + cotton(B + 4, nh3Left ? "hydrochloric acid" : "ammonia", nh3Left ? "#3c9a5f" : "#2f6f9f", true);
+        g += `<path d="M${A} 140 H${B}" stroke="#5b6675" stroke-width="2"/>` + Array.from({ length: 11 }, (_, i) => { const x = A + i * LEN / 10;
+          return `<path d="M${x} 140 V${i % 5 ? 146 : 150}" stroke="#5b6675" stroke-width="1.5"/>${i % 5 === 0 ? `<text x="${x}" y="164" text-anchor="middle" font-size="12" class="lbl">${i * 10} cm</text>` : ""}`; }).join("");
+        if (guess !== null) g += `<path d="M${guess} 104 l-6 12 h12 z" fill="#b4531f"/><text x="${guess}" y="132" text-anchor="middle" font-size="12" fill="#b4531f">your guess</text>`;
+        el("tube").innerHTML = g;
+        el("r3").textContent = met ? `ring at ${cm(met.x)} cm, after ${met.t.toFixed(0)} s` : running ? `${t.toFixed(1)} s` : "not started";
+        requestAnimationFrame(loop);
+      })(performance.now());
+    }
+
+    draw();
+  },
+});
+
 ARCADE.start();
 </script>
 </body>
