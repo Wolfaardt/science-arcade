@@ -1761,19 +1761,27 @@ ARCADE.toy({
 // same person on the Earth, the Moon, Mars, Jupiter and out in deep space, where the mass never
 // changes but the weight does; spin the Earth under the Moon and read a harbour's tide gauge, with
 // spring and neap tides from where the Moon is; and watch energy move between stores — a skateboard
-// on a ramp, a torch, a hot drink, a catapult — with the total staying the same.
+// on a ramp, a torch, a hot drink, a catapult — with the total staying the same. Added 19 Nov 2026:
+// a nebula pulled together by gravity into the Sun and planets, with and without spin, and the
+// evidence for and against that idea.
 //
 // Layout rules (agent-contract §6): every drawing is an svg.scene inside its own viewBox, labels at
 // 12 units or more, readouts in HTML chips, option pickers in .ctrl.pick.
 ARCADE.toy({
   id: "g06-u03-space", unit: "g06-u03", order: 1,
   name: "Space and Energy", icon: "🪐",
-  blurb: "Launch a planet, weigh yourself on the Moon, make tides and follow the energy",
+  blurb: "Launch a planet, build the Solar System from dust, weigh yourself on the Moon, make tides and follow the energy",
   discoveries: [
     ["crash", "Pulled in", "Launch a planet too slowly"],
     ["orbit", "In orbit", "Get a planet to go all the way round"],
     ["escape", "Flew away", "Launch a planet too fast"],
     ["straight", "A straight line", "Switch gravity off and launch"],
+    ["clump", "Clumps grow", "Let gravity act on the cloud of dust and gas"],
+    ["sun", "A star is born", "Keep watching the middle of the cloud"],
+    ["planets", "Planets in orbit", "Wait for clumps to grow into planets"],
+    ["nospin", "No spin, no planets", "Stop the cloud spinning and let gravity act"],
+    ["evidence", "Evidence for", "Tap a fact that supports the idea"],
+    ["venus", "Evidence against", "Find the fact that does not fit"],
     ["moon", "Lighter on the Moon", "Weigh yourself on the Moon"],
     ["jupiter", "Heavy on Jupiter", "Weigh yourself on Jupiter"],
     ["space", "Weightless", "Go out into deep space"],
@@ -1789,7 +1797,7 @@ ARCADE.toy({
   mount(root, api) {
     let tab = "orbit", run = 0;
     const alive = r => r === run && document.body.contains(root);
-    const tabs = [["orbit", "🪐 Orbits"], ["weigh", "⚖️ Weigh me"], ["tide", "🌊 Tides"], ["energy", "⚡ Energy"]];
+    const tabs = [["orbit", "🪐 Orbits"], ["form", "☁️ Birth of the Sun"], ["weigh", "⚖️ Weigh me"], ["tide", "🌊 Tides"], ["energy", "⚡ Energy"]];
     const el = id => document.getElementById(id);
     const say = m => { const p = el("msg"); if (p && p.textContent !== m) { p.textContent = m; api.say(m); } };
     function shell(inner) {
@@ -1799,7 +1807,7 @@ ARCADE.toy({
       root.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { tab = b.dataset.tab; draw(); });
       return run;
     }
-    function draw() { ({ orbit: orbitBench, weigh: weighBench, tide: tideBench, energy: energyBench })[tab](); }
+    function draw() { ({ orbit: orbitBench, form: formBench, weigh: weighBench, tide: tideBench, energy: energyBench })[tab](); }
     const pickRow = (attr, label, opts, on) => `<div class="ctrl pick"><span class="lead">${label}</span>${opts.map(([k, n]) =>
       `<button data-${attr}="${k}" class="${k === on ? "on" : ""}">${n}</button>`).join("")}</div>`;
     const wirePick = (attr, fn) => root.querySelectorAll(`[data-${attr}]`).forEach(b => b.onclick = () => {
@@ -2019,6 +2027,77 @@ ARCADE.toy({
             <text x="${cx}" y="186" font-size="12" text-anchor="middle" class="lbl">${k}</text><text x="${cx}" y="${164 - h}" font-size="12" text-anchor="middle">${Math.round(E[k])}</text>`;
         }).join("");
         el("r1").textContent = `total ${Math.round(keys.reduce((a, k) => a + E[k], 0))} units`;
+      }
+    }
+
+    // ── formation: a cloud of dust and gas pulled together by gravity ──
+    function formBench() {
+      const CX = 150, CY = 120, RINGS = [44, 64, 84, 104], COLS = ["#b4531f", "#4a90d9", "#d64545", "#c9a14a"];
+      let spin = true, going = false, P = [], S = 0, t = 0, lit = false;
+      const fresh = () => { going = false; S = 0; t = 0; lit = false;
+        P = Array.from({ length: 180 }, () => ({ r: 6 + 108 * Math.random(), a: Math.random() * 6.283, m: 1, w: 1 + 0.12 * (Math.random() - 0.5) })); };
+      fresh();
+      const r = shell(`<svg class="scene" viewBox="0 0 300 240" role="img" aria-label="A cloud of dust and gas in space, seen from above"><g id="neb"></g></svg>
+        <div class="ctrl"><button id="go">▶️ Let gravity act</button><button id="sp">🌀 Spin: on</button><button id="nw">🔄 New cloud</button></div>
+        <div class="readout"><span class="chip" id="r1"></span></div>
+        <p class="muted" id="msg">4.6 billion years ago: a cloud of dust and gas, a nebula. Every speck has mass, so every speck has a little gravity. Let it act.</p>
+        <div class="ctrl pick"><span class="lead">Evidence</span><button data-ev="way">🔄 All planets orbit the same way</button><button data-ev="flat">📏 They orbit in one flat plane</button><button data-ev="venus">🔃 Venus spins backwards</button></div>`);
+      el("go").onclick = () => { if (!P.length && !S) fresh(); going = true; };
+      el("sp").onclick = () => { spin = !spin; el("sp").textContent = `🌀 Spin: ${spin ? "on" : "off"}`; fresh(); say(spin ? "A spinning cloud. Let gravity act." : "This cloud is not spinning at all. Let gravity act and see what is different."); };
+      el("nw").onclick = () => { fresh(); say("A new cloud of dust and gas. Let gravity act."); };
+      root.querySelectorAll("[data-ev]").forEach(b => b.onclick = () => {
+        root.querySelectorAll("[data-ev]").forEach(o => o.classList.toggle("on", o === b));
+        if (b.dataset.ev === "venus") { api.found("venus"); say("This one goes against the idea: if everything formed from one spinning cloud, Venus should spin the same way as the others. So most of the evidence supports the idea — but not all of it."); }
+        else { api.found("evidence"); say(b.dataset.ev === "way" ? "Supports the idea. The cloud was spinning one way, so everything made from it still goes round that way — watch the planets here." : "Supports the idea. A spinning cloud flattens into a disc, so the planets that form in it all end up in one flat plane."); }
+      });
+      let last = performance.now();
+      (function loop(now) {
+        if (!alive(r)) return;
+        const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)) * 1.5; last = now;
+        if (going) {
+          t += dt;
+          const sunR = 3 + Math.sqrt(S) * 1.1;
+          P.forEach(p => {
+            if (!spin || p.r < 30) { p.r -= (10 + 500 / (p.r + 6)) * dt; if (p.r < sunR) { S += p.m; p.m = 0; } }
+            else {
+              const ring = RINGS.reduce((b, x) => Math.abs(x - p.r) < Math.abs(b - p.r) ? x : b);
+              p.ring = ring; p.r += (ring - p.r) * 0.8 * dt; p.a += 0.9 * Math.pow(44 / p.r, 1.5) * p.w * dt;
+            }
+          });
+          // clumps on each ring pull together and stick: more mass, stronger pull
+          RINGS.forEach(R => {
+            const ring = P.filter(p => p.m && p.ring === R && Math.abs(p.r - R) < 6);
+            ring.forEach(p => {
+              let f = 0;
+              ring.forEach(q => { if (q === p) return; let d = q.a - p.a; d = Math.atan2(Math.sin(d), Math.cos(d)); f += q.m * Math.sign(d) / (Math.abs(d) + 0.3); });
+              p.a += Math.max(-0.03, Math.min(0.03, 0.04 * f / Math.sqrt(p.m) * dt));   // capped, so nothing skips past a neighbour
+            });
+            for (let i = 0; i < ring.length; i++) for (let j = i + 1; j < ring.length; j++) {
+              const p = ring[i], q = ring[j]; if (!p.m || !q.m) continue;
+              let d = q.a - p.a; d = Math.atan2(Math.sin(d), Math.cos(d));
+              if (Math.abs(d) * R < 2.5 + Math.sqrt(p.m + q.m) * 0.8) { const [big, sm] = p.m >= q.m ? [p, q] : [q, p]; big.a += d * (big === p ? 1 : -1) * sm.m / (big.m + sm.m); big.m += sm.m; big.w = (big.w * (big.m - sm.m) + sm.w * sm.m) / big.m; sm.m = 0; }
+            }
+          });
+          P = P.filter(p => p.m);
+          if (P.some(p => p.m >= 4) && api.found("clump")) say("Specks are sticking into clumps. A clump has more mass, so stronger gravity, so it pulls in even more.");
+          if (S >= 25 && !lit) { lit = true; if (api.found("sun")) say("The ball in the middle has pulled in so much that it is hot enough to shine. A star is born: the Sun."); }
+          const planets = P.filter(p => p.m >= 8).length;
+          if (lit && planets >= 3 && api.found("planets")) say("Smaller balls are orbiting the Sun: planets. They all go round the same way, because the cloud they came from was spinning that way. This took millions of years.");
+          if (!spin && !P.length && api.found("nospin")) say("With no spin, everything fell straight into the middle: one big star and no planets. The spin of the cloud is what left material going round.");
+        } else P.forEach(p => { p.a += 0.02 * (p.w - 1) * Math.sin(now / 900); });
+        render(now);
+        requestAnimationFrame(loop);
+      })(performance.now());
+      function render(now) {
+        const sunR = 3 + Math.sqrt(S) * 1.1;
+        const big = P.filter(p => p.m >= 8).length;
+        el("r1").textContent = !going ? "a cloud of dust and gas" : `Sun ${lit ? "shining" : "growing"} · ${big} planet${big === 1 ? "" : "s"} so far`;
+        el("neb").innerHTML = `<rect x="0" y="0" width="300" height="240" fill="#0e1726"/>
+          ${[[20, 30], [270, 20], [250, 200], [40, 210], [140, 15], [290, 120], [10, 120]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1" fill="#ffffff"/>`).join("")}
+          ${S ? `${lit ? `<circle cx="${CX}" cy="${CY}" r="${sunR * 2.2 + Math.sin(now / 300)}" fill="#f2b705" opacity="0.25"/>` : ""}<circle cx="${CX}" cy="${CY}" r="${sunR}" fill="${lit ? "#f2b705" : "#8b3a1a"}"/>` : ""}
+          ${P.map(p => { const x = CX + p.r * Math.cos(p.a), y = CY + p.r * Math.sin(p.a), rr = p.m >= 3 ? 1.6 + Math.sqrt(p.m) * 0.9 : 1.6;
+            return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rr.toFixed(1)}" fill="${p.m >= 3 ? COLS[RINGS.indexOf(p.ring)] || "#c9ced4" : "#c9ced4"}" opacity="${p.m >= 3 ? 1 : 0.6}"/>`; }).join("")}
+          ${lit ? `<text x="${CX}" y="${CY + sunR + 16}" font-size="12" text-anchor="middle" fill="#f2b705">Sun</text>` : ""}`;
       }
     }
 
@@ -5193,14 +5272,16 @@ ARCADE.toy({
 // (balanced forces keep it still or keep it sliding, double the mass halves the acceleration, and
 // friction stops it); a spring loaded 1 N at a time whose extension graph is straight until the limit
 // of proportionality, after which it stays stretched; a see-saw balanced by moments; and a brick on
-// sand on each face, plus a tank whose jets reach further the deeper the hole.
+// sand on each face, plus a tank whose jets reach further the deeper the hole. A fifth bench, added
+// 19 Nov 2026 for Grade 7 Unit 3 (which shares this toy): an aeroplane whose thrust and lift you set,
+// read one pair at a time — thrust against air resistance for speed, lift against weight for height.
 //
 // Layout rules (agent-contract §6): every drawing is an svg.scene inside its own viewBox, labels at
 // 12 units or more, readouts in HTML chips, option pickers in .ctrl.pick.
 ARCADE.toy({
   id: "g9-0654-p02-forces", unit: "g9-0654-p02", units: ["g9-0654-p02", "g07-u03"], order: 1,
   name: "Force Lab", icon: "🏋️",
-  blurb: "Push a crate, stretch a spring, balance a see-saw and press a brick into sand",
+  blurb: "Push a crate, stretch a spring, balance a see-saw, press a brick into sand and fly a plane",
   discoveries: [
     ["balanced", "Balanced, so no change", "Push equally from both sides"],
     ["resultant", "Resultant force", "Push harder one way and watch it speed up"],
@@ -5214,11 +5295,16 @@ ARCADE.toy({
     ["unequal", "Light but far out", "Balance a heavy weight with a lighter one"],
     ["sink", "Small face, big pressure", "Stand the brick on its smallest face"],
     ["deep", "Deeper, stronger jet", "Open the deepest hole in the tank"],
+    ["cruise", "Steady and level", "Balance both pairs of forces on the aeroplane"],
+    ["catchup", "Air resistance catches up", "Give the aeroplane more thrust and wait"],
+    ["slow", "Slowing down", "Make the thrust smaller than the air resistance"],
+    ["climb", "Going higher", "Make the lift bigger than the weight"],
+    ["descend", "Going lower", "Make the lift smaller than the weight"],
   ],
   mount(root, api) {
     let tab = "push", run = 0;
     const alive = r => r === run && document.body.contains(root);
-    const tabs = [["push", "📦 Resultant"], ["spring", "🌀 Spring"], ["seesaw", "⚖️ Moments"], ["press", "🧱 Pressure"]];
+    const tabs = [["push", "📦 Resultant"], ["spring", "🌀 Spring"], ["seesaw", "⚖️ Moments"], ["press", "🧱 Pressure"], ["plane", "✈️ Aeroplane"]];
     const el = id => document.getElementById(id);
     const say = m => { const p = el("msg"); if (p && p.textContent !== m) { p.textContent = m; api.say(m); } };
     function shell(inner) {
@@ -5228,7 +5314,7 @@ ARCADE.toy({
       root.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { tab = b.dataset.tab; draw(); });
       return run;
     }
-    function draw() { ({ push: pushBench, spring: springBench, seesaw: seesawBench, press: pressBench })[tab](); }
+    function draw() { ({ push: pushBench, spring: springBench, seesaw: seesawBench, press: pressBench, plane: planeBench })[tab](); }
     const pickRow = (attr, label, opts, on) => `<div class="ctrl pick"><span class="lead">${label}</span>${opts.map(([k, n]) =>
       `<button data-${attr}="${k}" class="${k === on ? "on" : ""}">${n}</button>`).join("")}</div>`;
     const wirePick = (attr, fn) => root.querySelectorAll(`[data-${attr}]`).forEach(b => b.onclick = () => {
@@ -5413,6 +5499,53 @@ ARCADE.toy({
         el("r2").textContent = hole === null ? "tap a hole" : `water pressure ${[1000, 3000, 5000][hole]} Pa`;
       }
       render();
+    }
+
+    // ── aeroplane: four forces in two pairs ─────────────────────────────
+    function planeBench() {
+      const W = 50;   // weight, kN
+      let T = 25, L = 50, v = 80, h = 3000, steady = 0, sped = false, clouds = [[40, 50], [160, 90], [250, 40], [90, 140]];
+      const r = shell(`<svg class="scene" viewBox="0 0 300 200" role="img" aria-label="An aeroplane in flight with arrows for thrust, air resistance, lift and weight"><g id="sky"></g></svg>
+        <div class="ctrl slider"><label for="th">Thrust (engines)</label><input type="range" id="th" min="0" max="40" value="25"><span class="chip" id="thv">25 kN</span></div>
+        <div class="ctrl slider"><label for="li">Lift (wings)</label><input type="range" id="li" min="30" max="70" step="5" value="50"><span class="chip" id="liv">50 kN</span></div>
+        <div class="readout"><span class="chip" id="r1"></span><span class="chip" id="r2"></span></div>
+        <p class="muted" id="msg">Weight is 50 kN and stays the same. Change the thrust and the lift, and read the forces one pair at a time.</p>`);
+      el("th").oninput = () => { T = +el("th").value; el("thv").textContent = `${T} kN`; };
+      el("li").oninput = () => { L = +el("li").value; el("liv").textContent = `${L} kN`; };
+      let last = performance.now();
+      (function loop(now) {
+        if (!alive(r)) return;
+        const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+        const D = 0.0025 * v * v;                       // air resistance grows with speed
+        const before = v;
+        v = Math.max(0, v + (T - D) * 0.8 * dt);
+        h = Math.max(0, Math.min(12000, h + (L - W) * 40 * dt));
+        if (T - D > 2) sped = true;
+        if (sped && Math.abs(T - D) < 0.4 && T > 5 && api.found("catchup"))
+          say(`The faster it went, the bigger the air resistance — until it matched the thrust at ${T} kN. Now the forward and backward forces are balanced, so the speed stays the same.`);
+        if (D - T > 2 && before > v && api.found("slow")) say("Air resistance is bigger than the thrust, so the backward force wins and the plane slows down.");
+        if (L > W && h < 12000 && api.found("climb")) say("Lift is bigger than weight. The upward force wins, so the plane goes higher.");
+        if (L < W && h > 0 && api.found("descend")) say("Lift is smaller than weight. The downward force wins, so the plane goes lower.");
+        steady = Math.abs(T - D) < 0.5 && L === W ? steady + dt : 0;
+        if (steady > 2 && api.found("cruise")) say("Thrust equals air resistance and lift equals weight. Both pairs are balanced: constant speed, constant height. The plane is still moving — balanced forces do not mean stopped.");
+        if (h === 0 && L < W) say("Down on the ground. Give it more lift.");
+        clouds.forEach(c => { c[0] -= v * 0.5 * dt; if (c[0] < -40) c[0] = 340; });
+        const st = Math.abs(T - D) < 0.5 ? "steady speed" : T > D ? "speeding up" : "slowing down";
+        const ht = L === W || (h === 0 && L < W) || (h === 12000 && L > W) ? "same height" : L > W ? "going higher" : "going lower";
+        el("r1").textContent = `${Math.round(v * 3.6)} km/h · ${st}`;
+        el("r2").textContent = `${Math.round(h)} m · ${ht}`;
+        const py = 100, px = 150, a = f => f * 1.4;
+        const varr = (y, len, col, label, down) => { if (len < 1) return ""; const d = down ? 1 : -1, tip = y + d * len;
+          return `<path d="M${px} ${y} V${tip - d * 9}" stroke="${col}" stroke-width="5"/><path d="M${px} ${tip} l-7 ${-d * 10} h14 Z" fill="${col}"/><text x="${px + 10}" y="${tip - d * 4 + (down ? 0 : 8)}" font-size="12" fill="${col}">${label}</text>`; };
+        const ground = h < 1500 ? `<rect x="0" y="${190 - (1500 - h) / 1500 * 40 + 40}" width="300" height="60" fill="#7aa35a" opacity="0.5"/>` : "";
+        el("sky").innerHTML = `<rect x="0" y="0" width="300" height="200" fill="#4a90d9" opacity="0.12"/>${ground}
+          ${clouds.map(([x, y]) => `<g opacity="0.7"><ellipse cx="${x}" cy="${y}" rx="22" ry="8" fill="#ffffff" stroke="#c9ced4"/><ellipse cx="${x + 10}" cy="${y - 5}" rx="12" ry="7" fill="#ffffff"/></g>`).join("")}
+          <g transform="translate(${px} ${py})"><ellipse rx="42" ry="8" fill="#dfe4ea" stroke="#5b6675" stroke-width="2"/><path d="M-36 -4 L-46 -20 H-38 L-24 -5 Z" fill="#9aa6b3" stroke="#5b6675"/>
+          <path d="M-6 2 L-18 16 H-8 L10 3 Z" fill="#9aa6b3" stroke="#5b6675"/><path d="M30 -4 Q38 -4 41 0" fill="none" stroke="#4a90d9" stroke-width="3"/></g>
+          ${arrow(px + 44, py, a(T), "#d64545", `thrust ${T}`)}${arrow(px - 44, py, -a(D), "#7f8c99", "")}<text x="${px - 52}" y="${py + 22}" font-size="12" text-anchor="end" fill="#7f8c99">air resistance ${D.toFixed(0)}</text>
+          ${varr(py - 10, a(L) * 0.8, "#2e8b57", `lift ${L}`, false)}${varr(py + 10, a(W) * 0.8, "#7b5ea7", `weight ${W}`, true)}`;
+        requestAnimationFrame(loop);
+      })(performance.now());
     }
 
     draw();
